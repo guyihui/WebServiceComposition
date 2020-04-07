@@ -49,6 +49,9 @@ public class Main {
         System.out.println("service nodes: " + graph.getServiceNodeSet().size());
         CompositionSolution solution = graph.search(serviceX, 1.0, 5);
         System.out.println("isExistingService: " + solution.isExistingService);
+
+        System.out.println(solution);
+        solution.prune();
         System.out.println(solution);
     }
 

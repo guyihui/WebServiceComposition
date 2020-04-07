@@ -5,6 +5,7 @@ import serviceUtils.Service;
 
 import java.util.*;
 
+//TODO: 多线程
 public class ServiceGraph {
 
     protected Set<DataNode> dataNodeSet = new HashSet<>();
@@ -55,6 +56,8 @@ public class ServiceGraph {
     }
 
     // TODO: 是否需要允许在满足所有输出后额外多搜几轮
+    // TODO: 会不会存在无输入/输出的服务
+    // TODO: 环情况会不会陷入死循环？
     public final CompositionSolution search(Service service, double similarityLimit, int roundLimit) {
         CompositionSolution solution = new CompositionSolution(service, similarityLimit, roundLimit);
         // 寻找图中是否存在该服务
@@ -84,8 +87,6 @@ public class ServiceGraph {
             int round = 0;
             // 当 target 输出还不能全部获得时，并且没有超出轮数限制
             while (unresolvedTarget.size() > 0 && round++ < roundLimit) {
-                System.out.println("Round " + round);
-
                 // 根据 加入的新输入节点 获取可执行服务
                 Set<ServiceNode> availableServiceNode = new HashSet<>();
                 Set<ServiceNode> unavailableServiceNode = new HashSet<>();
@@ -139,6 +140,7 @@ public class ServiceGraph {
                 // 如果 target 全部得到，则提前结束
                 if (unresolvedTarget.size() == 0) {
                     solution.isResolved = true;
+                    solution.round = round;
                     break;
                 }
                 // 已经在 available 中的跳过，新产生的节点加入 availableNew

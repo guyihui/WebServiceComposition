@@ -1,11 +1,11 @@
 package serviceUtils.serviceGraph;
 
 public class DataNode {
-    enum Type {
+    public enum Type {
         INPUT, OUTPUT,
     }
 
-    Type type;
+    public Type type;
     private String word;
     private ServiceNode serviceNode;
 
