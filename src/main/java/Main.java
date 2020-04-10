@@ -1,6 +1,9 @@
 import serviceUtils.CompositionSolution;
 import serviceUtils.Service;
+import serviceUtils.executionPath.ExecutionPath;
 import serviceUtils.serviceGraph.ServiceGraph;
+
+import java.util.Set;
 
 public class Main {
     public static void main(String[] args) {
@@ -10,32 +13,32 @@ public class Main {
         String descriptionX = "Given certain location, take photo and get temperature.";
         String[] inputsX = {"location"};
         String[] outputsX = {"photo", "temperature"};
-        Service serviceX = new Service(1, descriptionX, inputsX, outputsX);
+        Service serviceX = new Service(0, descriptionX, inputsX, outputsX);
 
         String descriptionA = "get the temperature somewhere";
         String[] inputsA = {"location"};
         String[] outputsA = {"temperature"};
-        Service serviceA = new Service(2, descriptionA, inputsA, outputsA);
+        Service serviceA = new Service(1, descriptionA, inputsA, outputsA);
 
         String descriptionB = "get longitude and latitude";
         String[] inputsB = {"location"};
         String[] outputsB = {"longitude", "latitude"};
-        Service serviceB = new Service(3, descriptionB, inputsB, outputsB);
+        Service serviceB = new Service(2, descriptionB, inputsB, outputsB);
 
         String descriptionC = "according to (latitude, longitude), take photo by satellite";
         String[] inputsC = {"latitude", "longitude"};
         String[] outputsC = {"photo"};
-        Service serviceC = new Service(4, descriptionC, inputsC, outputsC);
+        Service serviceC = new Service(3, descriptionC, inputsC, outputsC);
 
-        String descriptionD = "interfere 1";
+        String descriptionD = "get longitude";
         String[] inputsD = {"location"};
-        String[] outputsD = {"message"};
-        Service serviceD = new Service(5, descriptionD, inputsD, outputsD);
+        String[] outputsD = {"longitude"};
+        Service serviceD = new Service(4, descriptionD, inputsD, outputsD);
 
-        String descriptionE = "interfere 2";
-        String[] inputsE = {"pdf"};
-        String[] outputsE = {"txt"};
-        Service serviceE = new Service(6, descriptionE, inputsE, outputsE);
+        String descriptionE = "get timezone";
+        String[] inputsE = {"longitude"};
+        String[] outputsE = {"UTC timezone"};
+        Service serviceE = new Service(5, descriptionE, inputsE, outputsE);
 
 //        X = A // (B -> C)
         graph.addService(serviceX);
@@ -45,14 +48,11 @@ public class Main {
         graph.addService(serviceD);
         graph.addService(serviceE);
 
-        System.out.println("data nodes: " + graph.getDataNodeSet().size());
-        System.out.println("service nodes: " + graph.getServiceNodeSet().size());
+        System.out.println(graph);
         CompositionSolution solution = graph.search(serviceX, 1.0, 5);
-        System.out.println("isExistingService: " + solution.isExistingService);
-
         System.out.println(solution);
-        solution.prune();
-        System.out.println(solution);
+        Set<ExecutionPath> paths = solution.extractExecutionPaths();
+        System.out.println(paths);
     }
 
 }

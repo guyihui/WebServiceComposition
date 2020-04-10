@@ -16,14 +16,6 @@ public class ServiceGraph {
     public ServiceGraph() {
     }
 
-    // TODO: 根据词向量模型获取相似度
-    // TODO: 同一个服务的输入输出是否需要设置相似度<=0.0，代表不允许语义匹配
-    private double mockSimilarity(DataNode node1, DataNode node2) {
-        String word1 = node1.getWord();
-        String word2 = node2.getWord();
-        return word1.equals(word2) ? 1.0 : 0.0;
-    }
-
     public final void addService(Service service) {
         ServiceNode serviceNode = new ServiceNode(service);
         List<DataNode> inputs = new ArrayList<>();
@@ -53,6 +45,14 @@ public class ServiceGraph {
         serviceNode.setInputs(inputs);
         serviceNode.setOutputs(outputs);
         serviceNodeSet.add(serviceNode);
+    }
+
+    // TODO: 根据词向量模型获取相似度
+    // TODO: 同一个服务的输入输出是否需要设置相似度<=0.0，代表不允许语义匹配
+    private double mockSimilarity(DataNode node1, DataNode node2) {
+        String word1 = node1.getWord();
+        String word2 = node2.getWord();
+        return word1.equals(word2) ? 1.0 : 0.0;
     }
 
     // TODO: 是否需要允许在满足所有输出后额外多搜几轮
@@ -152,6 +152,8 @@ public class ServiceGraph {
                 }
             }
         }
+        solution.prune();
+        solution.collectMatchEdge();
         return solution;
     }
 
@@ -177,4 +179,12 @@ public class ServiceGraph {
         return serviceNodeSet;
     }
 
+    @Override
+    public String toString() {
+        return "=======\nService Graph {\n"
+                + "\tData nodes(" + dataNodeSet.size() + "): " + dataNodeSet.toString() + "\n"
+                + "\tService nodes(" + serviceNodeSet.size() + "): " + serviceNodeSet.toString() + "\n"
+                + "\tMap size: " + similarityMap.size() + "\n"
+                + "}";
+    }
 }
