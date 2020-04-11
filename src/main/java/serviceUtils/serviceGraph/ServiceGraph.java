@@ -55,6 +55,7 @@ public class ServiceGraph {
         return word1.equals(word2) ? 1.0 : 0.0;
     }
 
+    // TODO: 搜索新加入的服务替换方案（图中不包含）
     // TODO: 是否需要允许在满足所有输出后额外多搜几轮
     // TODO: 会不会存在无输入/输出的服务
     // TODO: 环情况会不会陷入死循环？
@@ -69,6 +70,9 @@ public class ServiceGraph {
                 solution.setTargetServiceNode(node);
                 break;
             }
+        }
+        if (targetServiceNode == null) {
+            return solution;
         }
         // 对于图中某个已经存在的服务进行方案搜索
         if (solution.isExistingService && solution.getTargetServiceNode() != null) {
@@ -144,7 +148,6 @@ public class ServiceGraph {
                     break;
                 }
                 // 已经在 available 中的跳过，新产生的节点加入 availableNew
-                // TODO: 如果是产生已有的输出，需不需要考虑新的输出？不会漏相关服务，但是执行路径可能有影响（环）
                 for (DataNode node : outputsNew) {
                     if (!availableDataNode.contains(node)) {
                         availableDataNodeNew.add(node);

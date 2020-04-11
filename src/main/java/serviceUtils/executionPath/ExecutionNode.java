@@ -8,7 +8,7 @@ public class ExecutionNode implements ExecutionPathNode {
     }
 
     public Type type;
-    public ServiceNode serviceNode;
+    private ServiceNode serviceNode;
 
     public ExecutionNode(Type type, ServiceNode serviceNode) {
         this.type = type;

@@ -15,9 +15,6 @@ public class DataNode {
         this.serviceNode = serviceNode;
     }
 
-    private DataNode() {
-    }
-
     public ServiceNode getServiceNode() {
         return serviceNode;
     }

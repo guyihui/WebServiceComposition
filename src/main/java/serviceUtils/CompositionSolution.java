@@ -89,6 +89,22 @@ public class CompositionSolution extends ServiceGraph {
         this.dataNodeSet.addAll(targetServiceNode.getInputs());
     }
 
+    // 只从输入反向扩展到输出，初始输入额外处理
+    private void reverseExpand(Set<DataNode> validDataNodeNew, Set<DataNode> expandSet) {
+        for (DataNode node : validDataNodeNew) {
+            for (DataNode toExpand : this.dataNodeSet) {
+                if (node != toExpand // 不同节点
+                        && toExpand.type != DataNode.Type.INPUT // 反向遍历不扩展到其他输入节点
+                        && similarityMap.get(node).get(toExpand) >= similarityLimit) {
+                    expandSet.add(toExpand);
+                }
+            }
+        }
+        validDataNodeNew.addAll(expandSet);
+        expandSet.clear();
+        this.dataNodeSet.removeAll(validDataNodeNew);
+    }
+
     // 整理图中的匹配边
     public void collectMatchEdge() {
         matchCount = 0;
@@ -121,28 +137,15 @@ public class CompositionSolution extends ServiceGraph {
         }
     }
 
-    // 只从输入反向扩展到输出，初始输入额外处理
-    private void reverseExpand(Set<DataNode> validDataNodeNew, Set<DataNode> expandSet) {
-        for (DataNode node : validDataNodeNew) {
-            for (DataNode toExpand : this.dataNodeSet) {
-                if (node != toExpand // 不同节点
-                        && toExpand.type != DataNode.Type.INPUT // 反向遍历不扩展到其他输入节点
-                        && similarityMap.get(node).get(toExpand) >= similarityLimit) {
-                    expandSet.add(toExpand);
-                }
-            }
-        }
-        validDataNodeNew.addAll(expandSet);
-        expandSet.clear();
-        this.dataNodeSet.removeAll(validDataNodeNew);
-    }
 
-
-    // TODO: 提取：得到无歧义/多余路径的实际执行路径（可能存在多种）
-    // TODO: 返回完整的set（先实现返回一种结果）
+    // 提取：得到无歧义/多余路径的实际执行路径（可能存在多种）
+    // 返回完整的set
     // TODO: 是否会出现栈溢出，递归/非递归
     public Set<ExecutionPath> extractExecutionPaths() {
         Set<ExecutionPath> results = new HashSet<>();
+        if (!this.isResolved) {
+            return results;
+        }
         //需要通过匹配解决的target
         ExecutionPath executionPath = new ExecutionPath(this.targetServiceNode.getOutputs());
         completeExecutionPath(executionPath, results);

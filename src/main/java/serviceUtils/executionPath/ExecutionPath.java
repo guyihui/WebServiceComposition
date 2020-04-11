@@ -34,6 +34,7 @@ public class ExecutionPath implements Cloneable {
     @Override
     public Object clone() throws CloneNotSupportedException {
         ExecutionPath clone = (ExecutionPath) super.clone();
+        // 复制尚未匹配的节点map
         clone.unresolvedExecutionHeads = new HashMap<>();
         for (Map.Entry<ExecutionNode, Set<DataNode>> entry : this.unresolvedExecutionHeads.entrySet()) {
             ExecutionNode key = entry.getKey();
@@ -41,6 +42,7 @@ public class ExecutionPath implements Cloneable {
             Set<DataNode> cloneValue = new HashSet<>(value);
             clone.unresolvedExecutionHeads.put(key, cloneValue);
         }
+        // 复制匹配连接边
         clone.pathMap = new HashMap<>();
         for (Map.Entry<ExecutionPathNode, Set<ExecutionPathNode>> entry : this.pathMap.entrySet()) {
             ExecutionPathNode key = entry.getKey();
