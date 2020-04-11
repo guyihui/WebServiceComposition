@@ -1,11 +1,7 @@
 package serviceUtils;
 
-import serviceUtils.executionPath.ExecutionNode;
-import serviceUtils.executionPath.ExecutionPath;
-import serviceUtils.executionPath.MatchNode;
-import serviceUtils.serviceGraph.DataNode;
-import serviceUtils.serviceGraph.ServiceGraph;
-import serviceUtils.serviceGraph.ServiceNode;
+import serviceUtils.executionPath.*;
+import serviceUtils.serviceGraph.*;
 
 import java.util.*;
 
@@ -148,9 +144,8 @@ public class CompositionSolution extends ServiceGraph {
     public Set<ExecutionPath> extractExecutionPaths() {
         Set<ExecutionPath> results = new HashSet<>();
         //需要通过匹配解决的target
-        ExecutionPath executionPath = new ExecutionPath();
-        completeExecutionPath(executionPath, executionPath.endNode, results);
-        results.add(executionPath);
+        ExecutionPath executionPath = new ExecutionPath(this.targetServiceNode.getOutputs());
+        completeExecutionPath(executionPath, results);
         //合并反向路径中重复的部分
         for (ExecutionPath path : results) {
             path.merge();
@@ -158,43 +153,69 @@ public class CompositionSolution extends ServiceGraph {
         return results;
     }
 
-    //TODO: 需要遍历所有情况
-    private void completeExecutionPath(ExecutionPath executionPath, ExecutionNode executionHead, Set<ExecutionPath> pathSet) {
-        // 递归终点：起点ExecutionNode
-        if (executionHead == executionPath.startNode) {
+    //每次递归完成一个match
+    // compositeLengthLimit: 限制组合长度，避免无穷环路径
+    private void completeExecutionPath(ExecutionPath path, Set<ExecutionPath> pathSet) {
+        // 递归终点：所有execution节点的输入匹配完毕
+        Map<ExecutionNode, Set<DataNode>> unresolvedExecutionHeadMap = path.getUnresolvedExecutionHeads();
+        if (unresolvedExecutionHeadMap.isEmpty()) {
+            pathSet.add(path);
             return;
         }
-        List<DataNode> matchTargetSet;
-        //execution节点的输入
-        if (executionHead == executionPath.endNode) {
-            matchTargetSet = this.targetServiceNode.getOutputs();
-        } else {
-            matchTargetSet = executionHead.getServiceNode().getInputs();
-        }
-        //补充每个待匹配节点之前的路径
-        for (DataNode node : matchTargetSet) {
-            Set<DataNode> matchCandidate = matchEdge.get(node).keySet();
-            //TODO:遍历所有匹配可能
+        //取出这一轮需要匹配的节点（这些节点不能被修改）
+        // ExecutionNode及其输入
+        Iterator<Map.Entry<ExecutionNode, Set<DataNode>>> headMapItr = unresolvedExecutionHeadMap.entrySet().iterator();
+        Map.Entry<ExecutionNode, Set<DataNode>> mapEntry = headMapItr.next();
+        final ExecutionNode executionHead = mapEntry.getKey();
+        final Set<DataNode> unresolvedInputs = mapEntry.getValue();
+        // 其中的一个输入
+        Iterator<DataNode> dataNodeItr = unresolvedInputs.iterator();
+        final DataNode toMatch = dataNodeItr.next();
+
+        //匹配候选
+        //当有多个可能性时, clone副本, 尝试所有匹配可能
+        Set<DataNode> matchCandidate = matchEdge.get(toMatch).keySet();
+        int candidateNo = 0;
+        try {
             for (DataNode candidate : matchCandidate) {
+                candidateNo++;
+                ExecutionPath clonePath;
+                if (candidateNo == matchCandidate.size()) { //最后一个候选，不需要clone
+                    clonePath = path;
+                } else { // 否则需要clone（深拷贝）后分开操作
+                    clonePath = (ExecutionPath) path.clone();
+                }
+
+                //在clonePath上补全
                 ExecutionNode preNode;
-                //如果是原始输入，则前置 ExecutionNode 为起点node
-                if (targetServiceNode.getInputs().contains(candidate)) {
-                    preNode = executionPath.startNode;
+                if (targetServiceNode.getInputs().contains(candidate)) {//如果是原始输入，则前置 ExecutionNode 为起点node
+                    preNode = ExecutionPath.START_NODE;
                 } else {//否则，preNode为产生该candidate输出的node
                     preNode = new ExecutionNode(ExecutionNode.Type.COMPONENT, candidate.getServiceNode());
                 }
-                MatchNode matchNode = new MatchNode(candidate, node);
+                MatchNode matchNode = new MatchNode(candidate, toMatch);
                 // 连接路径
                 // preNode -> matchNode -> executionHead -> ...
-                executionHead.addInputMatchNode(matchNode);
-                matchNode.setToNode(executionHead);
-                matchNode.setFromNode(preNode);
-                preNode.addOutputMatchNode(matchNode);
+                clonePath.connect(preNode, matchNode);
+                clonePath.connect(matchNode, executionHead);
+                // 更新待匹配map（需要对clone出的path进行操作）
+                Map<ExecutionNode, Set<DataNode>> unresolvedExecutionHeadMapInClonePath = clonePath.getUnresolvedExecutionHeads();
+                Set<DataNode> unresolvedInputsInClonePath = unresolvedExecutionHeadMapInClonePath.get(executionHead);
+                unresolvedInputsInClonePath.remove(toMatch);//需要解决的头节点的一个输入匹配完成
+                if (unresolvedInputsInClonePath.isEmpty()) {// 输入全部匹配 = 运行节点匹配完成
+                    unresolvedExecutionHeadMapInClonePath.remove(executionHead);
+                }
+                if (preNode.type == ExecutionNode.Type.COMPONENT) { // 产生的新的运行节点
+                    Set<DataNode> inputsNew = new HashSet<>(preNode.getServiceNode().getInputs());
+                    unresolvedExecutionHeadMapInClonePath.put(preNode, inputsNew);
+                }
                 // 递归，完成前置路径
-                completeExecutionPath(executionPath, preNode, pathSet);
-                break;//TODO: 当有多个可能性时应该clone副本
+                completeExecutionPath(clonePath, pathSet);
             }
+        } catch (CloneNotSupportedException e) {
+            e.printStackTrace();
         }
+
     }
 
 
