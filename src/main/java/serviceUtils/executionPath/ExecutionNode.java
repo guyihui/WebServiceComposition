@@ -15,6 +15,12 @@ public class ExecutionNode implements ExecutionPathNode {
         this.serviceNode = serviceNode;
     }
 
+    public boolean mayMergeWith(ExecutionNode other) {
+        return this != other
+                && this.type == Type.COMPONENT && other.type == Type.COMPONENT
+                && this.serviceNode == other.serviceNode;
+    }
+
     public ServiceNode getServiceNode() {
         return serviceNode;
     }

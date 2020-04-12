@@ -11,6 +11,12 @@ public class MatchNode implements ExecutionPathNode {
         this.matchTargetNode = matchTargetNode;
     }
 
+    public boolean mayMergeWith(MatchNode other) {
+        return this != other
+                && this.matchSourceNode == other.matchSourceNode
+                && this.matchTargetNode == other.matchTargetNode;
+    }
+
     @Override
     public String toString() {
         return "(" + matchSourceNode + "->" + matchTargetNode + ")";

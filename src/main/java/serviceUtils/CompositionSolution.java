@@ -199,8 +199,8 @@ public class CompositionSolution extends ServiceGraph {
                 MatchNode matchNode = new MatchNode(candidate, toMatch);
                 // 连接路径
                 // preNode -> matchNode -> executionHead -> ...
-                clonePath.connect(preNode, matchNode);
-                clonePath.connect(matchNode, executionHead);
+                clonePath.connect(preNode, matchNode, ExecutionPath.ConnectType.EXECUTION_TO_MATCH);
+                clonePath.connect(matchNode, executionHead, ExecutionPath.ConnectType.MATCH_TO_EXECUTION);
                 // 更新待匹配map（需要对clone出的path进行操作）
                 Map<ExecutionNode, Set<DataNode>> unresolvedExecutionHeadMapInClonePath = clonePath.getUnresolvedExecutionHeads();
                 Set<DataNode> unresolvedInputsInClonePath = unresolvedExecutionHeadMapInClonePath.get(executionHead);
