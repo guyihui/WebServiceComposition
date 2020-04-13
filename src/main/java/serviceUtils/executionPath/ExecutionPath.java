@@ -6,15 +6,20 @@ import java.util.*;
 
 //TODO: 环情况
 public class ExecutionPath implements Cloneable {
+    //可以类公用的虚拟头尾节点
     public static final ExecutionNode START_NODE = new ExecutionNode(ExecutionNode.Type.START, null);
     public static final ExecutionNode END_NODE = new ExecutionNode(ExecutionNode.Type.END, null);
-    private Map<ExecutionNode, Set<DataNode>> unresolvedExecutionHeads = new HashMap<>();//<需要匹配的头节点，其需要匹配的输入>
+    // 用来表示某一条具体路径的边信息
     private Map<ExecutionPathNode, Set<ExecutionPathNode>> pathMap = new HashMap<>();//连接边
     private Map<ExecutionNode, Set<MatchNode>> preMatchNodes = new HashMap<>();//每个运行节点需要的前置matchNode
+    // 提取过程中的辅助数据结构
+    private volatile Map<ExecutionNode, Set<DataNode>> unresolvedExecutionHeads = new HashMap<>();//<需要匹配的头节点，其需要匹配的输入>
+    private volatile Map<ExecutionNode, Integer> unresolvedHeadLength = new HashMap<>();//待匹配节点之后的路径长度
 
     public ExecutionPath(Collection<DataNode> matchTargets) {
         Set<DataNode> toMatchSet = new HashSet<>(matchTargets);
         unresolvedExecutionHeads.put(END_NODE, toMatchSet);
+        unresolvedHeadLength.put(END_NODE, 0);
     }
 
     public enum ConnectType {
@@ -47,7 +52,8 @@ public class ExecutionPath implements Cloneable {
             ExecutionNode n2 = (ExecutionNode) node2;
             Set<MatchNode> preMatch1 = preMatchNodes.get(n1);
             Set<MatchNode> preMatch2 = preMatchNodes.get(n2);
-            return preMatch1.containsAll(preMatch2) && preMatch2.containsAll(preMatch1);
+            return n1.mayMergeWith(n2) &&
+                    preMatch1.containsAll(preMatch2) && preMatch2.containsAll(preMatch1);
         }
         return false;
     }
@@ -116,17 +122,13 @@ public class ExecutionPath implements Cloneable {
         return unresolvedExecutionHeads;
     }
 
+    public Map<ExecutionNode, Integer> getUnresolvedHeadLength() {
+        return unresolvedHeadLength;
+    }
+
     @Override
     public Object clone() throws CloneNotSupportedException {
         ExecutionPath clone = (ExecutionPath) super.clone();
-        // 复制尚未匹配的节点map
-        clone.unresolvedExecutionHeads = new HashMap<>();
-        for (Map.Entry<ExecutionNode, Set<DataNode>> entry : this.unresolvedExecutionHeads.entrySet()) {
-            ExecutionNode key = entry.getKey();
-            Set<DataNode> value = entry.getValue();
-            Set<DataNode> cloneValue = new HashSet<>(value);
-            clone.unresolvedExecutionHeads.put(key, cloneValue);
-        }
         // 复制匹配连接边
         clone.pathMap = new HashMap<>();
         for (Map.Entry<ExecutionPathNode, Set<ExecutionPathNode>> entry : this.pathMap.entrySet()) {
@@ -142,6 +144,21 @@ public class ExecutionPath implements Cloneable {
             Set<MatchNode> value = entry.getValue();
             Set<MatchNode> cloneValue = new HashSet<>(value);
             clone.preMatchNodes.put(key, cloneValue);
+        }
+        // 复制尚未匹配的节点map
+        clone.unresolvedExecutionHeads = new HashMap<>();
+        for (Map.Entry<ExecutionNode, Set<DataNode>> entry : this.unresolvedExecutionHeads.entrySet()) {
+            ExecutionNode key = entry.getKey();
+            Set<DataNode> value = entry.getValue();
+            Set<DataNode> cloneValue = new HashSet<>(value);
+            clone.unresolvedExecutionHeads.put(key, cloneValue);
+        }
+        // 复制待匹配节点之后的路径长度
+        clone.unresolvedHeadLength = new HashMap<>();
+        for (Map.Entry<ExecutionNode, Integer> entry : this.unresolvedHeadLength.entrySet()) {
+            ExecutionNode key = entry.getKey();
+            Integer value = entry.getValue();
+            clone.unresolvedHeadLength.put(key, value);
         }
         return clone;
     }

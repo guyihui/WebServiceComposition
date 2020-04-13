@@ -83,10 +83,11 @@ public class ServiceGraph {
             Set<DataNode> availableDataNodeNew = new HashSet<>(inputs);// 需要根据相似度进行扩展的节点
             Set<DataNode> unresolvedTarget = new HashSet<>(outputs);// 最终需要得到的输出
 
+            solution.getDataNodeSet().addAll(inputs);
+            solution.getDataNodeSet().addAll(outputs);
+
             // 首先根据相似度进行扩展
             expandBySimilarity(similarityLimit, availableDataNodeNew);
-            // 保存在 solution 中
-            solution.getDataNodeSet().addAll(availableDataNodeNew);
 
             int round = 0;
             // 当 target 输出还不能全部获得时，并且没有超出轮数限制
@@ -132,7 +133,10 @@ public class ServiceGraph {
                 expandBySimilarity(similarityLimit, outputsNew);
                 // 保存solution
                 solution.getServiceNodeSet().addAll(availableServiceNode);
-                solution.getDataNodeSet().addAll(outputsNew);
+                for (ServiceNode available : availableServiceNode) {
+                    solution.getDataNodeSet().addAll(available.getInputs());
+                    solution.getDataNodeSet().addAll(available.getOutputs());
+                }
                 // 若 target 被满足，从 target 集合中移除
                 Set<DataNode> resolvedTarget = new HashSet<>();
                 for (DataNode node : unresolvedTarget) {

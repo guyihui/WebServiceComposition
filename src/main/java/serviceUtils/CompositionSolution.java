@@ -137,18 +137,17 @@ public class CompositionSolution extends ServiceGraph {
         }
     }
 
-
     // 提取：得到无歧义/多余路径的实际执行路径（可能存在多种）
     // 返回完整的set
     // TODO: 是否会出现栈溢出，递归/非递归
-    public Set<ExecutionPath> extractExecutionPaths() {
+    public Set<ExecutionPath> extractExecutionPaths(int compositeLengthLimit) {
         Set<ExecutionPath> results = new HashSet<>();
         if (!this.isResolved) {
             return results;
         }
         //需要通过匹配解决的target
         ExecutionPath executionPath = new ExecutionPath(this.targetServiceNode.getOutputs());
-        completeExecutionPath(executionPath, results);
+        completeExecutionPath(executionPath, results, compositeLengthLimit);
         //合并反向路径中重复的部分
         for (ExecutionPath path : results) {
             path.merge();
@@ -158,7 +157,7 @@ public class CompositionSolution extends ServiceGraph {
 
     //每次递归完成一个match
     // compositeLengthLimit: 限制组合长度，避免无穷环路径
-    private void completeExecutionPath(ExecutionPath path, Set<ExecutionPath> pathSet) {
+    private void completeExecutionPath(ExecutionPath path, Set<ExecutionPath> pathSet, int compositeLengthLimit) {
         // 递归终点：所有execution节点的输入匹配完毕
         Map<ExecutionNode, Set<DataNode>> unresolvedExecutionHeadMap = path.getUnresolvedExecutionHeads();
         if (unresolvedExecutionHeadMap.isEmpty()) {
@@ -170,6 +169,10 @@ public class CompositionSolution extends ServiceGraph {
         Iterator<Map.Entry<ExecutionNode, Set<DataNode>>> headMapItr = unresolvedExecutionHeadMap.entrySet().iterator();
         Map.Entry<ExecutionNode, Set<DataNode>> mapEntry = headMapItr.next();
         final ExecutionNode executionHead = mapEntry.getKey();
+        Integer headLength = path.getUnresolvedHeadLength().get(executionHead);
+        if (headLength == null || headLength > compositeLengthLimit) {
+            return;//超出长度上限，path舍弃
+        }
         final Set<DataNode> unresolvedInputs = mapEntry.getValue();
         // 其中的一个输入
         Iterator<DataNode> dataNodeItr = unresolvedInputs.iterator();
@@ -202,18 +205,22 @@ public class CompositionSolution extends ServiceGraph {
                 clonePath.connect(preNode, matchNode, ExecutionPath.ConnectType.EXECUTION_TO_MATCH);
                 clonePath.connect(matchNode, executionHead, ExecutionPath.ConnectType.MATCH_TO_EXECUTION);
                 // 更新待匹配map（需要对clone出的path进行操作）
+                Map<ExecutionNode, Integer> unresolvedHeadLengthInClonePath = clonePath.getUnresolvedHeadLength();
                 Map<ExecutionNode, Set<DataNode>> unresolvedExecutionHeadMapInClonePath = clonePath.getUnresolvedExecutionHeads();
                 Set<DataNode> unresolvedInputsInClonePath = unresolvedExecutionHeadMapInClonePath.get(executionHead);
                 unresolvedInputsInClonePath.remove(toMatch);//需要解决的头节点的一个输入匹配完成
+                int executionHeadLength = unresolvedHeadLengthInClonePath.get(executionHead);
                 if (unresolvedInputsInClonePath.isEmpty()) {// 输入全部匹配 = 运行节点匹配完成
                     unresolvedExecutionHeadMapInClonePath.remove(executionHead);
+                    unresolvedHeadLengthInClonePath.remove(executionHead);
                 }
                 if (preNode.type == ExecutionNode.Type.COMPONENT) { // 产生的新的运行节点
                     Set<DataNode> inputsNew = new HashSet<>(preNode.getServiceNode().getInputs());
                     unresolvedExecutionHeadMapInClonePath.put(preNode, inputsNew);
+                    unresolvedHeadLengthInClonePath.put(preNode, executionHeadLength + 1);
                 }
                 // 递归，完成前置路径
-                completeExecutionPath(clonePath, pathSet);
+                completeExecutionPath(clonePath, pathSet, compositeLengthLimit);
             }
         } catch (CloneNotSupportedException e) {
             e.printStackTrace();
