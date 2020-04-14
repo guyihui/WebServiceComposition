@@ -47,6 +47,8 @@ public class ServiceGraph {
         serviceNodeSet.add(serviceNode);
     }
 
+    // TODO: 删除/修改服务
+
     // TODO: 根据词向量模型获取相似度
     // TODO: 同一个服务的输入输出是否需要设置相似度<=0.0，代表不允许语义匹配
     private double mockSimilarity(DataNode node1, DataNode node2) {
@@ -58,7 +60,6 @@ public class ServiceGraph {
     // TODO: 搜索新加入的服务替换方案（图中不包含）
     // TODO: 是否需要允许在满足所有输出后额外多搜几轮
     // TODO: 会不会存在无输入/输出的服务
-    // TODO: 环情况会不会陷入死循环？
     public final CompositionSolution search(Service service, double similarityLimit, int roundLimit) {
         CompositionSolution solution = new CompositionSolution(service, similarityLimit, roundLimit);
         // 寻找图中是否存在该服务

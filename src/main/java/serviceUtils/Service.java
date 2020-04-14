@@ -1,5 +1,7 @@
 package serviceUtils;
 
+import java.util.Arrays;
+
 public class Service {
     private int id;
     private String description;
@@ -11,6 +13,21 @@ public class Service {
         this.description = description;
         this.inputs = inputs;
         this.outputs = outputs;
+    }
+
+    //TODO: 检查服务是否可用
+    public boolean isAvailable() {
+        return true;
+    }
+
+    //TODO: 执行服务，返回结果
+    public Object[] run(Object[] args) {
+        Object[] results = Arrays.copyOf(outputs, outputs.length);
+        System.out.println("run Service[" + id + "]:"
+                + Arrays.toString(args)
+                + " --> "
+                + Arrays.toString(results));
+        return results;
     }
 
     public int getId() {

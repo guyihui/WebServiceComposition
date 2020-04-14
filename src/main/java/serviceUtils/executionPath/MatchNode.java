@@ -17,6 +17,14 @@ public class MatchNode implements ExecutionPathNode {
                 && this.matchTargetNode == other.matchTargetNode;
     }
 
+    public DataNode getMatchSourceNode() {
+        return matchSourceNode;
+    }
+
+    public DataNode getMatchTargetNode() {
+        return matchTargetNode;
+    }
+
     @Override
     public String toString() {
         return "(" + matchSourceNode + "->" + matchTargetNode + ")";

@@ -146,7 +146,7 @@ public class CompositionSolution extends ServiceGraph {
             return results;
         }
         //需要通过匹配解决的target
-        ExecutionPath executionPath = new ExecutionPath(this.targetServiceNode.getOutputs());
+        ExecutionPath executionPath = new ExecutionPath(this);
         completeExecutionPath(executionPath, results, compositeLengthLimit);
         //合并反向路径中重复的部分
         for (ExecutionPath path : results) {
