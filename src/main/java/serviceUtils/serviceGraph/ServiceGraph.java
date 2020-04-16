@@ -9,42 +9,49 @@ import java.util.*;
 public class ServiceGraph {
 
     protected Set<DataNode> dataNodeSet = new HashSet<>();
-    protected Set<ServiceNode> serviceNodeSet = new HashSet<>();
+    protected Map<Integer, ServiceNode> serviceNodeMap = new HashMap<>();
     // TODO：作为value的Collection应当预排序
     protected static Map<DataNode, Map<DataNode, Double>> similarityMap = new HashMap<>();
 
     public ServiceGraph() {
     }
 
-    public final void addService(Service service) {
+    public final boolean addService(Service service) {
+        if (this.containsService(service)) {
+            return false;// 已经存在的服务不允许重复添加，只能修改
+        }
         ServiceNode serviceNode = new ServiceNode(service);
         List<DataNode> inputs = new ArrayList<>();
         List<DataNode> outputs = new ArrayList<>();
+        // 构造输入输出节点及其与serviceNode之间的连接边
         for (String output : service.getOutputs()) {
             DataNode outputNode = new DataNode(DataNode.Type.OUTPUT, output, serviceNode);
-            similarityMap.put(outputNode, new HashMap<>());
-            for (DataNode node : dataNodeSet) {
-                double similarity = mockSimilarity(outputNode, node);
-                similarityMap.get(node).put(outputNode, similarity);
-                similarityMap.get(outputNode).put(node, similarity);
-            }
-            dataNodeSet.add(outputNode);
-            outputs.add(outputNode);
+            this.addDataNode(outputs, outputNode);
         }
         for (String input : service.getInputs()) {
             DataNode inputNode = new DataNode(DataNode.Type.INPUT, input, serviceNode);
-            similarityMap.put(inputNode, new HashMap<>());
-            for (DataNode node : dataNodeSet) {
-                double similarity = mockSimilarity(inputNode, node);
-                similarityMap.get(node).put(inputNode, similarity);
-                similarityMap.get(inputNode).put(node, similarity);
-            }
-            dataNodeSet.add(inputNode);
-            inputs.add(inputNode);
+            this.addDataNode(inputs, inputNode);
         }
         serviceNode.setInputs(inputs);
         serviceNode.setOutputs(outputs);
-        serviceNodeSet.add(serviceNode);
+        serviceNodeMap.put(service.getId(), serviceNode);
+        return true;
+    }
+
+    // dataNode 加入list，并且计算与其他所有 dataNode 之间的相似度，存入map
+    private void addDataNode(List<DataNode> dataNodeList, DataNode dataNode) {
+        similarityMap.put(dataNode, new HashMap<>());
+        for (DataNode node : dataNodeSet) {
+            double similarity = this.mockSimilarity(dataNode, node);
+            similarityMap.get(node).put(dataNode, similarity);
+            similarityMap.get(dataNode).put(node, similarity);
+        }
+        dataNodeSet.add(dataNode);
+        dataNodeList.add(dataNode);
+    }
+
+    public boolean containsService(Service service) {
+        return serviceNodeMap.containsKey(service.getId());
     }
 
     // TODO: 删除/修改服务
@@ -63,18 +70,14 @@ public class ServiceGraph {
     public final CompositionSolution search(Service service, double similarityLimit, int roundLimit) {
         CompositionSolution solution = new CompositionSolution(service, similarityLimit, roundLimit);
         // 寻找图中是否存在该服务
-        ServiceNode targetServiceNode = null;
-        for (ServiceNode node : serviceNodeSet) {
-            if (node.getService().getId() == service.getId()) {
-                solution.isExistingService = true;
-                targetServiceNode = node;
-                solution.setTargetServiceNode(node);
-                break;
-            }
-        }
+        ServiceNode targetServiceNode = serviceNodeMap.get(service.getId());
         if (targetServiceNode == null) {
             return solution;
+        } else {
+            solution.isExistingService = true;
+            solution.setTargetServiceNode(targetServiceNode);
         }
+
         // 对于图中某个已经存在的服务进行方案搜索
         if (solution.isExistingService && solution.getTargetServiceNode() != null) {
             List<DataNode> inputs = targetServiceNode.getInputs();
@@ -88,7 +91,7 @@ public class ServiceGraph {
             solution.getDataNodeSet().addAll(outputs);
 
             // 首先根据相似度进行扩展
-            expandBySimilarity(similarityLimit, availableDataNodeNew);
+            this.expandBySimilarity(similarityLimit, availableDataNodeNew);
 
             int round = 0;
             // 当 target 输出还不能全部获得时，并且没有超出轮数限制
@@ -109,9 +112,7 @@ public class ServiceGraph {
                     // 对于未判断过的服务，检查服务输入是否 available
                     boolean isAvailable = true;
                     for (DataNode input : serviceNode.getInputs()) {
-                        if (availableDataNode.contains(input) || availableDataNodeNew.contains(input)) {
-                            continue;
-                        } else {
+                        if (!availableDataNode.contains(input) && !availableDataNodeNew.contains(input)) {
                             isAvailable = false;// 有输入unavailable
                             break;
                         }
@@ -125,16 +126,16 @@ public class ServiceGraph {
                 // 获取服务完毕的节点从 availableNew 移至 available
                 availableDataNode.addAll(availableDataNodeNew);
                 availableDataNodeNew.clear();
-                // 根据下一步可使用服务后，得到这些服务的输出
+                // 根据下一步可使用服务，得到这些服务的输出
                 Set<DataNode> outputsNew = new HashSet<>();
                 for (ServiceNode serviceNode : availableServiceNode) {
                     outputsNew.addAll(serviceNode.getOutputs());
                 }
                 // 根据相似度对结果进行扩展
-                expandBySimilarity(similarityLimit, outputsNew);
+                this.expandBySimilarity(similarityLimit, outputsNew);
                 // 保存solution
-                solution.getServiceNodeSet().addAll(availableServiceNode);
                 for (ServiceNode available : availableServiceNode) {
+                    solution.getServiceNodeMap().put(available.getService().getId(), available);
                     solution.getDataNodeSet().addAll(available.getInputs());
                     solution.getDataNodeSet().addAll(available.getOutputs());
                 }
@@ -147,7 +148,7 @@ public class ServiceGraph {
                 }
                 unresolvedTarget.removeAll(resolvedTarget);
                 // 如果 target 全部得到，则提前结束
-                if (unresolvedTarget.size() == 0) {
+                if (unresolvedTarget.isEmpty()) {
                     solution.isResolved = true;
                     solution.round = round;
                     break;
@@ -183,15 +184,15 @@ public class ServiceGraph {
         return dataNodeSet;
     }
 
-    public Set<ServiceNode> getServiceNodeSet() {
-        return serviceNodeSet;
+    public Map<Integer, ServiceNode> getServiceNodeMap() {
+        return serviceNodeMap;
     }
 
     @Override
     public String toString() {
         return "=======\nService Graph {\n"
                 + "\tData nodes(" + dataNodeSet.size() + "): " + dataNodeSet.toString() + "\n"
-                + "\tService nodes(" + serviceNodeSet.size() + "): " + serviceNodeSet.toString() + "\n"
+                + "\tService nodes(" + serviceNodeMap.size() + "): " + serviceNodeMap.toString() + "\n"
                 + "\tMap size: " + similarityMap.size() + "\n"
                 + "}";
     }

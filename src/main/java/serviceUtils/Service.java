@@ -23,6 +23,9 @@ public class Service {
     //TODO: 执行服务，返回结果
     public Object[] run(Object[] args) {
         Object[] results = Arrays.copyOf(outputs, outputs.length);
+        for (int i = 0; i < results.length; i++) {
+            results[i] += "{" + this.id + "}";
+        }
         System.out.println("run Service[" + id + "]:"
                 + Arrays.toString(args)
                 + " --> "
