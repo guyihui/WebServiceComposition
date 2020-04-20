@@ -1,7 +1,7 @@
-package serviceUtils.serviceGraph;
+package com.sjtu.composition.graph.serviceGraph;
 
-import serviceUtils.CompositionSolution;
-import serviceUtils.Service;
+import com.sjtu.composition.graph.CompositionSolution;
+import com.sjtu.composition.serviceUtils.Service;
 
 import java.util.*;
 

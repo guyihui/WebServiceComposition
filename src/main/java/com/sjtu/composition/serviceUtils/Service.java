@@ -1,8 +1,9 @@
-package serviceUtils;
+package com.sjtu.composition.serviceUtils;
 
 import java.util.Arrays;
 
 public class Service {
+
     private int id;
     private String description;
     private String[] inputs;

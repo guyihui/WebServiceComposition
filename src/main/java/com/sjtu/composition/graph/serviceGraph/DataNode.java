@@ -1,4 +1,4 @@
-package serviceUtils.serviceGraph;
+package com.sjtu.composition.graph.serviceGraph;
 
 public class DataNode {
     public enum Type {

@@ -1,6 +1,6 @@
-package serviceUtils.executionPath;
+package com.sjtu.composition.graph.executionPath;
 
-import serviceUtils.serviceGraph.ServiceNode;
+import com.sjtu.composition.graph.serviceGraph.ServiceNode;
 
 public class ExecutionNode implements ExecutionPathNode {
     public enum Type {

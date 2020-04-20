@@ -1,9 +1,9 @@
-package serviceUtils.executionPath;
+package com.sjtu.composition.graph.executionPath;
 
-import serviceUtils.CompositionSolution;
-import serviceUtils.Service;
-import serviceUtils.serviceGraph.DataNode;
-import serviceUtils.serviceGraph.ServiceNode;
+import com.sjtu.composition.graph.CompositionSolution;
+import com.sjtu.composition.graph.serviceGraph.DataNode;
+import com.sjtu.composition.graph.serviceGraph.ServiceNode;
+import com.sjtu.composition.serviceUtils.Service;
 
 import java.util.*;
 
