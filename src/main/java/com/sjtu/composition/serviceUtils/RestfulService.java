@@ -1,11 +1,14 @@
 package com.sjtu.composition.serviceUtils;
 
+import com.alibaba.fastjson.JSONObject;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.net.URI;
 import java.util.Set;
 
-public class RestfulService {
-    public enum RequestType {
-        GET, POST,
-    }
+
+public class RestfulService implements Service {
 
     // 服务描述信息：id、服务名、功能描述...
     private int id;//e.g.0?
@@ -36,10 +39,21 @@ public class RestfulService {
         return true;
     }
 
+    //TODO: 每个service一个template会不会有影响？rest template可能需要设置其他参数，不可能单例
+    RestTemplate restTemplate = new RestTemplate();
+
     //TODO: 执行服务，返回结果
-    public String run() {
-        StringBuilder builder = new StringBuilder(endpoint);
-        return "[" + this.requestType + "] " + builder.toString();
+    public JSONObject run(JSONObject input) {
+//        StringBuilder builder = new StringBuilder(endpoint);
+//        return "[" + this.requestType + "] " + builder.toString();
+        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(endpoint);
+        for (Parameter requestParam : requestParams) {
+            String paramName = requestParam.getName();
+            builder.queryParam(paramName, input.get(paramName));
+        }
+        URI uri = builder.build().encode().toUri();
+        JSONObject output = restTemplate.getForObject(uri, JSONObject.class);
+        return output;
     }
 
     //getter & setter
@@ -101,6 +115,6 @@ public class RestfulService {
 
     @Override
     public String toString() {
-        return description;
+        return "[" + name + "]" + "{" + description + "}";
     }
 }

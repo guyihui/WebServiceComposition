@@ -1,73 +1,49 @@
 package com.sjtu.composition.serviceUtils;
 
-import java.util.Arrays;
 
-public class Service {
+import com.alibaba.fastjson.JSONObject;
 
-    private int id;
-    private String description;
-    private String[] inputs;
-    private String[] outputs;
+import java.util.Set;
 
-    public Service(Integer id, String description, String[] inputs, String[] outputs) {
-        this.id = id;
-        this.description = description;
-        this.inputs = inputs;
-        this.outputs = outputs;
+public interface Service {
+    enum RequestType {
+        GET, POST, PUT, DELETE
     }
 
-    //TODO: 检查服务是否可用
-    public boolean isAvailable() {
-        return true;
-    }
+    boolean isAvailable();
 
-    //TODO: 执行服务，返回结果
-    public Object[] run(Object[] args) {
-        Object[] results = Arrays.copyOf(outputs, outputs.length);
-        for (int i = 0; i < results.length; i++) {
-            results[i] += "{" + this.id + "}";
-        }
-        System.out.println("run Service[" + id + "]:"
-                + Arrays.toString(args)
-                + " --> "
-                + Arrays.toString(results));
-        return results;
-    }
+    //TODO
+    JSONObject run(JSONObject input);
 
-    public int getId() {
-        return id;
-    }
 
-    public void setId(int id) {
-        this.id = id;
-    }
+    //getter & setter
+    int getId();
 
-    public String getDescription() {
-        return description;
-    }
+    void setId(int id);
 
-    public void setDescription(String description) {
-        this.description = description;
-    }
+    String getName();
 
-    public String[] getInputs() {
-        return inputs;
-    }
+    void setName(String name);
 
-    public void setInputs(String[] inputs) {
-        this.inputs = inputs;
-    }
+    String getDescription();
 
-    public String[] getOutputs() {
-        return outputs;
-    }
+    void setDescription(String description);
 
-    public void setOutputs(String[] outputs) {
-        this.outputs = outputs;
-    }
+    String getEndpoint();
 
-    @Override
-    public String toString() {
-        return description;
-    }
+    void setEndpoint(String endpoint);
+
+    RequestType getRequestType();
+
+    void setRequestType(RequestType requestType);
+
+    Set<Parameter> getRequestParams();
+
+    void setRequestParams(Set<Parameter> requestParams);
+
+    Set<Parameter> getResponseParams();
+
+    void setResponseParams(Set<Parameter> responseParams);
+
+
 }

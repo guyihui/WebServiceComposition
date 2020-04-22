@@ -1,6 +1,7 @@
 package com.sjtu.composition.graph.serviceGraph;
 
 import com.sjtu.composition.graph.CompositionSolution;
+import com.sjtu.composition.serviceUtils.Parameter;
 import com.sjtu.composition.serviceUtils.Service;
 
 import java.util.*;
@@ -21,14 +22,14 @@ public class ServiceGraph {
             return false;// 已经存在的服务不允许重复添加，只能修改
         }
         ServiceNode serviceNode = new ServiceNode(service);
-        List<DataNode> inputs = new ArrayList<>();
-        List<DataNode> outputs = new ArrayList<>();
+        Set<DataNode> inputs = new HashSet<>();
+        Set<DataNode> outputs = new HashSet<>();
         // 构造输入输出节点及其与serviceNode之间的连接边
-        for (String output : service.getOutputs()) {
+        for (Parameter output : service.getResponseParams()) {
             DataNode outputNode = new DataNode(DataNode.Type.OUTPUT, output, serviceNode);
             this.addDataNode(outputs, outputNode);
         }
-        for (String input : service.getInputs()) {
+        for (Parameter input : service.getRequestParams()) {
             DataNode inputNode = new DataNode(DataNode.Type.INPUT, input, serviceNode);
             this.addDataNode(inputs, inputNode);
         }
@@ -39,7 +40,7 @@ public class ServiceGraph {
     }
 
     // dataNode 加入list，并且计算与其他所有 dataNode 之间的相似度，存入map
-    private void addDataNode(List<DataNode> dataNodeList, DataNode dataNode) {
+    private void addDataNode(Set<DataNode> paramDataNodes, DataNode dataNode) {
         similarityMap.put(dataNode, new HashMap<>());
         for (DataNode node : dataNodeSet) {
             double similarity = this.mockSimilarity(dataNode, node);
@@ -47,7 +48,7 @@ public class ServiceGraph {
             similarityMap.get(dataNode).put(node, similarity);
         }
         dataNodeSet.add(dataNode);
-        dataNodeList.add(dataNode);
+        paramDataNodes.add(dataNode);
     }
 
     public boolean containsService(Service service) {
@@ -59,12 +60,12 @@ public class ServiceGraph {
     // TODO: 根据词向量模型获取相似度
     // TODO: 同一个服务的输入输出是否需要设置相似度<=0.0，代表不允许语义匹配
     private double mockSimilarity(DataNode node1, DataNode node2) {
-        String word1 = node1.getWord();
-        String word2 = node2.getWord();
+        String word1 = node1.getParam().getDescription();
+        String word2 = node2.getParam().getDescription();
         return word1.equals(word2) ? 1.0 : 0.0;
     }
 
-    // TODO: 搜索新加入的服务替换方案（图中不包含）
+    // TODO: 搜索新加入服务的组合替换方案（图中不包含）
     // TODO: 是否需要允许在满足所有输出后额外多搜几轮
     // TODO: 会不会存在无输入/输出的服务
     public final CompositionSolution search(Service service, double similarityLimit, int roundLimit) {
@@ -80,8 +81,8 @@ public class ServiceGraph {
 
         // 对于图中某个已经存在的服务进行方案搜索
         if (solution.isExistingService && solution.getTargetServiceNode() != null) {
-            List<DataNode> inputs = targetServiceNode.getInputs();
-            List<DataNode> outputs = targetServiceNode.getOutputs();
+            Set<DataNode> inputs = targetServiceNode.getInputs();
+            Set<DataNode> outputs = targetServiceNode.getOutputs();
 
             Set<DataNode> availableDataNode = new HashSet<>();// 已经扩展过的节点
             Set<DataNode> availableDataNodeNew = new HashSet<>(inputs);// 需要根据相似度进行扩展的节点

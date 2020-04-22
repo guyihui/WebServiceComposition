@@ -1,12 +1,16 @@
 package com.sjtu.composition.controller;
 
+import com.alibaba.fastjson.JSONObject;
 import com.sjtu.composition.serviceUtils.Parameter;
 import com.sjtu.composition.serviceUtils.RestfulService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import javax.annotation.PostConstruct;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -61,10 +65,20 @@ public class ForwardController {
 
     @GetMapping("/forward/{serviceId}")
     public String forward(@PathVariable("serviceId") int serviceId) {
-        RestfulService restfulService = serviceMap.get(serviceId);
-        if (restfulService == null) {
-            return null;
-        }
-        return restfulService.run();
+        return "???";
+    }
+
+
+    private RestTemplate restTemplate = new RestTemplate();
+
+    @GetMapping("/restTemplate")
+    public JSONObject restTemplate() {
+
+        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl("http://localhost:8080/satellite");
+        URI uri = builder
+                .queryParam("location", "食堂")
+                .build().encode().toUri();
+        JSONObject object = restTemplate.getForObject(uri, JSONObject.class);
+        return object;
     }
 }

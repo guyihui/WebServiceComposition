@@ -2,30 +2,30 @@ package com.sjtu.composition.graph.serviceGraph;
 
 import com.sjtu.composition.serviceUtils.Service;
 
-import java.util.List;
+import java.util.Set;
 
 public class ServiceNode {
     private Service service;
-    private List<DataNode> inputs;
-    private List<DataNode> outputs;
+    private Set<DataNode> inputs;
+    private Set<DataNode> outputs;
 
     public ServiceNode(Service service) {
         this.service = service;
     }
 
-    public List<DataNode> getInputs() {
+    public Set<DataNode> getInputs() {
         return inputs;
     }
 
-    public void setInputs(List<DataNode> inputs) {
+    public void setInputs(Set<DataNode> inputs) {
         this.inputs = inputs;
     }
 
-    public List<DataNode> getOutputs() {
+    public Set<DataNode> getOutputs() {
         return outputs;
     }
 
-    public void setOutputs(List<DataNode> outputs) {
+    public void setOutputs(Set<DataNode> outputs) {
         this.outputs = outputs;
     }
 

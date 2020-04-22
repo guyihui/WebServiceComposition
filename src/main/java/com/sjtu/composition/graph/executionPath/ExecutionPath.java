@@ -1,5 +1,6 @@
 package com.sjtu.composition.graph.executionPath;
 
+import com.alibaba.fastjson.JSONObject;
 import com.sjtu.composition.graph.CompositionSolution;
 import com.sjtu.composition.graph.serviceGraph.DataNode;
 import com.sjtu.composition.graph.serviceGraph.ServiceNode;
@@ -150,7 +151,7 @@ public class ExecutionPath implements Cloneable {
     }
 
     // TODO: 执行，返回执行结果
-    public Object[] run(List<Object> args) {
+    public JSONObject run(JSONObject args) {
         System.out.println(this);
         System.out.println("**** Run ****");
         System.out.println("Args:" + args);
@@ -158,74 +159,59 @@ public class ExecutionPath implements Cloneable {
         matchArgs = new HashMap<>();
         nextExecutions = new HashSet<>();
 
-        // 初始输入，放入二级节点
-        // 目标服务的参数列表，args 和 initialInputs 一一对应
-        List<DataNode> initialInputs = solution.getTargetServiceNode().getInputs();
+        // 初始输入 args 作为 START_NODE 的输出
         // 把实际参数和 matchNode 对应起来
-        Set<ExecutionPathNode> matchNodes = pathMap.get(START_NODE);
-        for (ExecutionPathNode node : matchNodes) {
-            MatchNode matchNode = (MatchNode) node;
-            DataNode sourceDataNode = matchNode.getMatchSourceNode();
-            // source 在提供的 args 中的位置
-            int argIdx = initialInputs.indexOf(sourceDataNode);
-            // 保存对应关系
-            matchArgs.put(matchNode, args.get(argIdx));
-            // 后续的 execution 放入 nextExecutions 中
-            nextExecutions.addAll(pathMap.get(node));
-        }
+        this.saveOutputMatch(args, START_NODE);
 
-//        System.out.println(matchArgs);
-//        System.out.println(nextExecutions);
         return this.recursiveExecute();
 
     }
 
-    private Object[] recursiveExecute() {
+    private void saveOutputMatch(JSONObject args, ExecutionNode executed) {
+        Set<ExecutionPathNode> matchNodes = pathMap.get(executed);
+        for (ExecutionPathNode node : matchNodes) {
+            MatchNode matchNode = (MatchNode) node;
+            DataNode sourceDataNode = matchNode.getMatchSourceNode();
+            // 保存对应关系和实际参数
+            matchArgs.put(matchNode, args.get(sourceDataNode.getParam().getName()));
+            // 后续的 execution 放入 nextExecutions 中
+            nextExecutions.addAll(pathMap.get(node));
+        }
+    }
+
+    private JSONObject recursiveExecute() {
         for (ExecutionPathNode pathNode : nextExecutions) {
             ExecutionNode executionNode = (ExecutionNode) pathNode;
             Set<MatchNode> requiredInputMatches = preMatchNodes.get(executionNode);
+            // TODO: 需要考虑必选/可选参数，暂时先只考虑必选
             // 如果 execution 需要的 matchNode 都已经有了对应数据，则可以执行
             if (matchArgs.keySet().containsAll(requiredInputMatches)) {
                 // 如果 end 满足条件，即结束执行
                 if (executionNode == END_NODE) {
-                    List<DataNode> requiredOutputs = solution.getTargetServiceNode().getOutputs();
                     Set<MatchNode> actualOutputMatches = preMatchNodes.get(END_NODE);
-                    Object[] actualOutputs = new Object[requiredOutputs.size()];
+                    JSONObject actualOutput = new JSONObject();
                     for (MatchNode matchNode : actualOutputMatches) {
-                        DataNode requiredOutput = matchNode.getMatchTargetNode();
-                        int outputIdx = requiredOutputs.indexOf(requiredOutput);
-                        actualOutputs[outputIdx] = matchArgs.get(matchNode);
+                        actualOutput.put(matchNode.getMatchTargetNode().getParam().getName(), matchArgs.get(matchNode));
                     }
-                    return actualOutputs;
+                    return actualOutput;
                 }
                 // 本次执行的服务及其节点
                 ServiceNode serviceNode = executionNode.getServiceNode();
                 Service service = serviceNode.getService();
                 // 1. 处理输入
-                // 对于每个 matchNode，找到其在调用参数中的位置
-                List<DataNode> requiredInputs = serviceNode.getInputs();
-                Object[] inputs = new Object[requiredInputs.size()];//实际调用参数列表
+                // 对于每个 matchNode，找到其对应调用参数
+                JSONObject input = new JSONObject();//实际调用参数
                 for (MatchNode matchNode : requiredInputMatches) {
-                    DataNode requiredArg = matchNode.getMatchTargetNode();
-                    int argIdx = requiredInputs.indexOf(requiredArg);
-                    inputs[argIdx] = matchArgs.get(matchNode);
+                    DataNode requiredArgNode = matchNode.getMatchTargetNode();
+                    input.put(requiredArgNode.getParam().getName(), matchArgs.get(matchNode));
                 }
                 // 2. 执行，移出 nextExecutions
                 // inputs构造完毕，调用服务，得到输出
                 nextExecutions.remove(pathNode);
-                Object[] outputs = service.run(inputs);
-                List<Object> outputList = Arrays.asList(outputs);
+                JSONObject output = service.run(input);
                 // 3. 处理输出
                 // 输出存入 matchArgs，并找出后续 execution
-                List<DataNode> expectedOutputs = serviceNode.getOutputs();
-                Set<ExecutionPathNode> producedMatches = pathMap.get(executionNode);
-                for (ExecutionPathNode producedNode : producedMatches) {
-                    MatchNode producedMatchNode = (MatchNode) producedNode;
-                    DataNode producedOutput = producedMatchNode.getMatchSourceNode();
-                    int outputIdx = expectedOutputs.indexOf(producedOutput);
-                    matchArgs.put(producedMatchNode, outputList.get(outputIdx));
-                    nextExecutions.addAll(pathMap.get(producedNode));
-                }
+                this.saveOutputMatch(output, executionNode);
                 break;
             }
         }

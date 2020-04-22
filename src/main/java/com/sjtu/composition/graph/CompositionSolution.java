@@ -48,7 +48,7 @@ public class CompositionSolution extends ServiceGraph {
 
     // 剪枝：删去反向不可达路径、节点
     public void prune() {
-        List<DataNode> outputs = targetServiceNode.getOutputs();
+        Set<DataNode> outputs = targetServiceNode.getOutputs();
         Set<DataNode> validDataNode = new HashSet<>();// 已经分析过的节点
         Set<DataNode> validDataNodeNew = new HashSet<>(outputs);// 通过反向路径查找
         Map<Integer, ServiceNode> validServiceNode = new HashMap<>();// 反向可达服务
