@@ -12,9 +12,7 @@ public interface Service {
 
     boolean isAvailable();
 
-    //TODO
     JSONObject run(JSONObject input);
-
 
     //getter & setter
     int getId();

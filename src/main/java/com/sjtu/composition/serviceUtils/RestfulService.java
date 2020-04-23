@@ -40,20 +40,17 @@ public class RestfulService implements Service {
     }
 
     //TODO: 每个service一个template会不会有影响？rest template可能需要设置其他参数，不可能单例
-    RestTemplate restTemplate = new RestTemplate();
+    private RestTemplate restTemplate = new RestTemplate();
 
     //TODO: 执行服务，返回结果
     public JSONObject run(JSONObject input) {
-//        StringBuilder builder = new StringBuilder(endpoint);
-//        return "[" + this.requestType + "] " + builder.toString();
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(endpoint);
         for (Parameter requestParam : requestParams) {
             String paramName = requestParam.getName();
             builder.queryParam(paramName, input.get(paramName));
         }
         URI uri = builder.build().encode().toUri();
-        JSONObject output = restTemplate.getForObject(uri, JSONObject.class);
-        return output;
+        return restTemplate.getForObject(uri, JSONObject.class);
     }
 
     //getter & setter

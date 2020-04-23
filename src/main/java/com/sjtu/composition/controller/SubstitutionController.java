@@ -8,16 +8,13 @@ import com.sjtu.composition.graph.serviceGraph.ServiceNode;
 import com.sjtu.composition.serviceUtils.Parameter;
 import com.sjtu.composition.serviceUtils.RestfulService;
 import com.sjtu.composition.serviceUtils.Service;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.PostConstruct;
 import java.util.*;
 
 @RestController
-public class CompositionController {
+public class SubstitutionController {
 
     private static final ServiceGraph graph = new ServiceGraph();
 
@@ -130,7 +127,7 @@ public class CompositionController {
     }
 
     @GetMapping("/")
-    public Set<Service> getGraphServices() {
+    public Set<Service> getAllServices() {
         Collection<ServiceNode> serviceNodes = graph.getServiceNodeMap().values();
         Set<Service> serviceSet = new HashSet<>();
         for (ServiceNode node : serviceNodes) {
@@ -140,31 +137,40 @@ public class CompositionController {
     }
 
     @GetMapping("/substitution")
-    public String substitutionIntroduction() {
+    public String substitutionGuide() {
         return "/substitution/{serviceId}?{?}={?}";
     }
 
     @GetMapping("/substitution/{serviceId}")
-    public JSONObject substitute(@PathVariable("serviceId") int serviceId) {
-        Service serviceX = graph.getServiceNodeMap().get(serviceId).getService();
+    public Service getService(@PathVariable("serviceId") int serviceId) {
+        return graph.getServiceNodeMap().get(serviceId).getService();
+    }
 
-        CompositionSolution solutionX = graph.search(serviceX, 0.99999999, 5);
-        System.out.println(solutionX);
-        Set<ExecutionPath> pathsX = solutionX.extractExecutionPaths(3);
-        System.out.println("Path count = " + pathsX.size());
+    @PostMapping(value = "/substitution/{serviceId}", produces = "application/json;charset=UTF-8")
+    public JSONObject substitute(@PathVariable("serviceId") int serviceId, @RequestBody JSONObject inputArgs) {
+        Service targetService = graph.getServiceNodeMap().get(serviceId).getService();
 
-        JSONObject argsX = new JSONObject();
-        argsX.put("location", "食堂{0}");
-        JSONObject resultX;
-        for (ExecutionPath path : pathsX) {
+        CompositionSolution solution = graph.search(targetService, 0.99999999, 5);
+        System.out.println(solution);
+        Set<ExecutionPath> paths = solution.extractExecutionPaths(3);
+        System.out.println("Path count = " + paths.size());
+
+        JSONObject result = new JSONObject();
+        for (ExecutionPath path : paths) {
             System.out.println();
             if (path.isAvailable()) {
-                resultX = path.run(argsX);
-                System.out.println(resultX);
+                result.put("isResolved", true);
+                result.put("result", path.run(inputArgs));//TODO:选择
+                System.out.println(result);
+                return result;
             }
         }
         System.out.println("\n______ test run serviceX ______");
-        return serviceX.run(argsX);
+        System.out.println(targetService.run(inputArgs));
+        result.put("isResolved", false);
+        result.put("recommend", null);
+        return result;
+
     }
 
 }
