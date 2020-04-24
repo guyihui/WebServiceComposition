@@ -1,5 +1,6 @@
 package com.sjtu.composition.graph.serviceGraph;
 
+import com.alibaba.fastjson.JSONObject;
 import com.sjtu.composition.graph.CompositionSolution;
 import com.sjtu.composition.serviceUtils.Parameter;
 import com.sjtu.composition.serviceUtils.Service;
@@ -68,12 +69,15 @@ public class ServiceGraph {
     // TODO: 搜索新加入服务的组合替换方案（图中不包含）
     // TODO: 是否需要允许在满足所有输出后额外多搜几轮
     // TODO: 会不会存在无输入/输出的服务
-    public final CompositionSolution search(Service service, double similarityLimit, int roundLimit) {
-        CompositionSolution solution = new CompositionSolution(service, similarityLimit, roundLimit);
+    public final boolean search(CompositionSolution solution) {
+        Service service = solution.getTargetService();
+        double similarityLimit = solution.getSimilarityLimit();
+        int roundLimit = solution.getRoundLimit();
+        JSONObject givenInput = solution.getGivenInputs();
         // 寻找图中是否存在该服务
         ServiceNode targetServiceNode = serviceNodeMap.get(service.getId());
         if (targetServiceNode == null) {
-            return solution;
+            return false;
         } else {
             solution.isExistingService = true;
             solution.setTargetServiceNode(targetServiceNode);
@@ -83,9 +87,15 @@ public class ServiceGraph {
         if (solution.isExistingService && solution.getTargetServiceNode() != null) {
             Set<DataNode> inputs = targetServiceNode.getInputs();
             Set<DataNode> outputs = targetServiceNode.getOutputs();
+            Set<DataNode> involvedInputs = new HashSet<>();
+            for (DataNode node : inputs) {
+                if (givenInput.containsKey(node.getParam().getName())) {
+                    involvedInputs.add(node);
+                }
+            }
 
             Set<DataNode> availableDataNode = new HashSet<>();// 已经扩展过的节点
-            Set<DataNode> availableDataNodeNew = new HashSet<>(inputs);// 需要根据相似度进行扩展的节点
+            Set<DataNode> availableDataNodeNew = new HashSet<>(involvedInputs);// 需要根据相似度进行扩展的节点
             Set<DataNode> unresolvedTarget = new HashSet<>(outputs);// 最终需要得到的输出
 
             solution.getDataNodeSet().addAll(inputs);
@@ -113,7 +123,9 @@ public class ServiceGraph {
                     // 对于未判断过的服务，检查服务输入是否 available
                     boolean isAvailable = true;
                     for (DataNode input : serviceNode.getInputs()) {
-                        if (!availableDataNode.contains(input) && !availableDataNodeNew.contains(input)) {
+                        if (input.getParam().isEssential()
+                                && !availableDataNode.contains(input)
+                                && !availableDataNodeNew.contains(input)) {
                             isAvailable = false;// 有输入unavailable
                             break;
                         }
@@ -162,9 +174,12 @@ public class ServiceGraph {
                 }
             }
         }
-        solution.prune();
-        solution.collectMatchEdge();
-        return solution;
+        if (solution.isResolved) {
+            solution.prune();
+            solution.collectMatchEdge();
+            return true;
+        }
+        return false;
     }
 
     // TODO: 遍历是否影响性能？改为预排序结构后需要重构

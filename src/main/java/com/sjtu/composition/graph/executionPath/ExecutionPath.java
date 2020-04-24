@@ -9,7 +9,6 @@ import com.sjtu.composition.serviceUtils.Service;
 import java.util.*;
 
 public class ExecutionPath implements Cloneable {
-    private CompositionSolution solution;
     //可以类公用的虚拟头尾节点
     public static final ExecutionNode START_NODE = new ExecutionNode(ExecutionNode.Type.START, null);
     public static final ExecutionNode END_NODE = new ExecutionNode(ExecutionNode.Type.END, null);
@@ -28,7 +27,6 @@ public class ExecutionPath implements Cloneable {
 
 
     public ExecutionPath(CompositionSolution solution) {
-        this.solution = solution;
         Set<DataNode> toMatchSet = new HashSet<>(solution.getTargetServiceNode().getOutputs());
         unresolvedExecutionHeads.put(END_NODE, toMatchSet);
         unresolvedHeadLength.put(END_NODE, 0);
@@ -183,7 +181,6 @@ public class ExecutionPath implements Cloneable {
         for (ExecutionPathNode pathNode : nextExecutions) {
             ExecutionNode executionNode = (ExecutionNode) pathNode;
             Set<MatchNode> requiredInputMatches = preMatchNodes.get(executionNode);
-            // TODO: 需要考虑必选/可选参数，暂时先只考虑必选
             // 如果 execution 需要的 matchNode 都已经有了对应数据，则可以执行
             if (matchArgs.keySet().containsAll(requiredInputMatches)) {
                 // 如果 end 满足条件，即结束执行
@@ -222,7 +219,7 @@ public class ExecutionPath implements Cloneable {
         return unresolvedExecutionHeads;
     }
 
-    public Map<ExecutionNode, Integer> getUnresolvedHeadLength() {
+    public Map<ExecutionNode, Integer> getUnresolvedHeadLengthMap() {
         return unresolvedHeadLength;
     }
 

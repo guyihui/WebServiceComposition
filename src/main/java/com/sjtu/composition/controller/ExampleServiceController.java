@@ -12,9 +12,13 @@ import java.util.List;
 public class ExampleServiceController {
 
     @GetMapping("/satellite")
-    public JSONObject satellite(@RequestParam("location") String location) {
+    public JSONObject satellite(@RequestParam("location") String location,
+                                @RequestParam(value = "alternative", required = false) String alternative) {
         List<Object> inputs = new ArrayList<>();
         inputs.add(location);
+        if (alternative != null) {
+            inputs.add(alternative);
+        }
         JSONObject output = new JSONObject();
         output.put("photo", location + ":照片{0}");
         output.put("temperature", location + ":温度{0}");
@@ -44,10 +48,15 @@ public class ExampleServiceController {
     }
 
     @GetMapping("/photo")
-    public JSONObject photo(@RequestParam("latitude") String latitude, @RequestParam("longitude") String longitude) {
+    public JSONObject photo(@RequestParam("latitude") String latitude,
+                            @RequestParam("longitude") String longitude,
+                            @RequestParam(value = "alternative", required = false) String alternative) {
         List<Object> inputs = new ArrayList<>();
         inputs.add(latitude);
         inputs.add(longitude);
+        if (alternative != null) {
+            inputs.add(alternative);
+        }
         JSONObject output = new JSONObject();
         output.put("photo", inputs + ":照片{3}");
         System.out.println("{[3]photo}:" + inputs + " --> " + output);

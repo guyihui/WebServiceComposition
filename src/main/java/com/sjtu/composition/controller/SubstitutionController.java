@@ -57,10 +57,17 @@ public class SubstitutionController {
                 "UTC时区",
                 true
         );
+        Parameter paramAlternative = new Parameter(
+                "alternative",
+                "可选参数干扰",
+                "可选项测试参数",
+                false
+        );
 
 
         Set<Parameter> inputsX = new HashSet<>();
         inputsX.add(paramLocation);
+        inputsX.add(paramAlternative);
         Set<Parameter> outputsX = new HashSet<>();
         outputsX.add(paramPhoto);
         outputsX.add(paramTemperature);
@@ -91,6 +98,7 @@ public class SubstitutionController {
         Set<Parameter> inputsC = new HashSet<>();
         inputsC.add(paramLatitude);
         inputsC.add(paramLongitude);
+        inputsC.add(paramAlternative);//非必选参数
         Set<Parameter> outputsC = new HashSet<>();
         outputsC.add(paramPhoto);
         Service serviceC = new RestfulService(
@@ -150,25 +158,35 @@ public class SubstitutionController {
     public JSONObject substitute(@PathVariable("serviceId") int serviceId, @RequestBody JSONObject inputArgs) {
         Service targetService = graph.getServiceNodeMap().get(serviceId).getService();
 
-        CompositionSolution solution = graph.search(targetService, 0.99999999, 5);
-        System.out.println(solution);
-        Set<ExecutionPath> paths = solution.extractExecutionPaths(3);
-        System.out.println("Path count = " + paths.size());
-
+        CompositionSolution solution = new CompositionSolution(
+                targetService,
+                0.99999999,
+                5,
+                inputArgs
+        );
         JSONObject result = new JSONObject();
-        for (ExecutionPath path : paths) {
-            System.out.println();
-            if (path.isAvailable()) {
-                result.put("isResolved", true);
-                result.put("result", path.run(inputArgs));//TODO:选择
-                System.out.println(result);
-                return result;
+
+        if (graph.search(solution)) { // 可尝试执行
+            System.out.println(solution);
+            Set<ExecutionPath> paths = solution.extractExecutionPaths(3);
+            System.out.println("Path count = " + paths.size());
+
+            for (ExecutionPath path : paths) {
+                System.out.println();
+                if (path.isAvailable()) {
+                    result.put("isResolved", true);
+                    result.put("result", path.run(inputArgs));//TODO:选择
+                    System.out.println(result);
+//                    return result;
+                }
             }
+        } else { //失败，推荐/其他情况
+//            System.out.println("\n______ test run serviceX ______");
+//            System.out.println(targetService.run(inputArgs));
+            result.put("isResolved", false);
+            result.put("recommend", null);
+            return result;
         }
-        System.out.println("\n______ test run serviceX ______");
-        System.out.println(targetService.run(inputArgs));
-        result.put("isResolved", false);
-        result.put("recommend", null);
         return result;
 
     }

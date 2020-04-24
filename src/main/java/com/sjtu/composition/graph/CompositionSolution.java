@@ -1,5 +1,6 @@
 package com.sjtu.composition.graph;
 
+import com.alibaba.fastjson.JSONObject;
 import com.sjtu.composition.graph.executionPath.*;
 import com.sjtu.composition.graph.serviceGraph.*;
 import com.sjtu.composition.serviceUtils.Service;
@@ -19,15 +20,18 @@ public class CompositionSolution extends ServiceGraph {
     private Service targetService;
     private double similarityLimit;
     private int roundLimit;
+    private JSONObject givenInputs;
+    //TODO:指定输出中需要获取的部分，而不是全部输出匹配
 
-    public CompositionSolution(Service targetService, double similarityLimit, int roundLimit) {
+    public CompositionSolution(Service targetService, double similarityLimit, int roundLimit, JSONObject input) {
         this.targetService = targetService;
         this.similarityLimit = similarityLimit;
         this.roundLimit = roundLimit;
+        this.givenInputs = input;
     }
 
     // 方案结果属性
-    public boolean isResolved = false;
+    public boolean isResolved = false;//TODO:对应原因
     public boolean isExistingService = false;
     private ServiceNode targetServiceNode = null;
     public int round;
@@ -42,7 +46,7 @@ public class CompositionSolution extends ServiceGraph {
 
     // 匹配关系
     private int matchCount;
-    private Map<DataNode, Map<DataNode, Double>> matchEdge = new HashMap<>();// 匹配边
+    private Map<DataNode, Map<DataNode, Double>> matchEdgeMap = new HashMap<>();// 匹配边
     private Set<DataNode> matchSource = new HashSet<>();//包括初始输入和服务的输出
     private Set<DataNode> matchTarget = new HashSet<>();//包括最终输出和服务的输入
 
@@ -108,7 +112,7 @@ public class CompositionSolution extends ServiceGraph {
     // 整理图中的匹配边
     public void collectMatchEdge() {
         matchCount = 0;
-        matchEdge.clear();
+        matchEdgeMap.clear();
         matchSource.clear();
         matchTarget.clear();
         for (DataNode node : this.dataNodeSet) {
@@ -127,10 +131,10 @@ public class CompositionSolution extends ServiceGraph {
             for (DataNode target : matchTarget) {
                 Double similarity = similarityMap.get(source).get(target);
                 if (similarity >= similarityLimit) {
-                    matchEdge.computeIfAbsent(source, k -> new HashMap<>());
-                    matchEdge.get(source).put(target, similarity);
-                    matchEdge.computeIfAbsent(target, k -> new HashMap<>());
-                    matchEdge.get(target).put(source, similarity);
+                    matchEdgeMap.computeIfAbsent(source, k -> new HashMap<>());
+                    matchEdgeMap.get(source).put(target, similarity);
+                    matchEdgeMap.computeIfAbsent(target, k -> new HashMap<>());
+                    matchEdgeMap.get(target).put(source, similarity);
                     matchCount++;
                 }
             }
@@ -169,7 +173,7 @@ public class CompositionSolution extends ServiceGraph {
         Iterator<Map.Entry<ExecutionNode, Set<DataNode>>> headMapItr = unresolvedExecutionHeadMap.entrySet().iterator();
         Map.Entry<ExecutionNode, Set<DataNode>> mapEntry = headMapItr.next();
         final ExecutionNode executionHead = mapEntry.getKey();
-        Integer headLength = path.getUnresolvedHeadLength().get(executionHead);
+        Integer headLength = path.getUnresolvedHeadLengthMap().get(executionHead);
         if (headLength == null || headLength > compositeLengthLimit) {
             return;//超出长度上限，path舍弃
         }
@@ -180,16 +184,30 @@ public class CompositionSolution extends ServiceGraph {
 
         //匹配候选
         //当有多个可能性时, clone副本, 尝试所有匹配可能
-        Set<DataNode> matchCandidate = matchEdge.get(toMatch).keySet();
-        int candidateNo = 0;
-        try {
+        Map<DataNode, Double> matchEdges = matchEdgeMap.get(toMatch);
+        if (toMatch.getParam().isEssential() && (matchEdges == null || matchEdges.isEmpty())) { //必选空候选
+            this.isResolved = false;
+            return;
+        }
+        if (matchEdges != null && !matchEdges.isEmpty()) {// 匹配
+            //候选非空（必选/可选）
+            Set<DataNode> matchCandidate = matchEdgeMap.get(toMatch).keySet();
+            int candidateNo = 0;
+
             for (DataNode candidate : matchCandidate) {
                 candidateNo++;
                 ExecutionPath clonePath;
-                if (candidateNo == matchCandidate.size()) { //最后一个候选，不需要clone
+                if (toMatch.getParam().isEssential() && candidateNo == matchCandidate.size()) {
+                    //必选参数的最后一个候选，不需要clone
                     clonePath = path;
                 } else { // 否则需要clone（深拷贝）后分开操作
-                    clonePath = (ExecutionPath) path.clone();
+                    try {
+                        clonePath = (ExecutionPath) path.clone();
+                    } catch (CloneNotSupportedException e) {
+                        e.printStackTrace();
+                        this.isResolved = false;
+                        return;
+                    }
                 }
 
                 //在clonePath上补全
@@ -205,7 +223,7 @@ public class CompositionSolution extends ServiceGraph {
                 clonePath.connect(preNode, matchNode, ExecutionPath.ConnectType.EXECUTION_TO_MATCH);
                 clonePath.connect(matchNode, executionHead, ExecutionPath.ConnectType.MATCH_TO_EXECUTION);
                 // 更新待匹配map（需要对clone出的path进行操作）
-                Map<ExecutionNode, Integer> unresolvedHeadLengthInClonePath = clonePath.getUnresolvedHeadLength();
+                Map<ExecutionNode, Integer> unresolvedHeadLengthInClonePath = clonePath.getUnresolvedHeadLengthMap();
                 Map<ExecutionNode, Set<DataNode>> unresolvedExecutionHeadMapInClonePath = clonePath.getUnresolvedExecutionHeads();
                 Set<DataNode> unresolvedInputsInClonePath = unresolvedExecutionHeadMapInClonePath.get(executionHead);
                 unresolvedInputsInClonePath.remove(toMatch);//需要解决的头节点的一个输入匹配完成
@@ -220,16 +238,42 @@ public class CompositionSolution extends ServiceGraph {
                     unresolvedHeadLengthInClonePath.put(preNode, executionHeadLength + 1);
                 }
                 // 递归，完成前置路径
-                completeExecutionPath(clonePath, pathSet, compositeLengthLimit);
+                this.completeExecutionPath(clonePath, pathSet, compositeLengthLimit);
             }
-        } catch (CloneNotSupportedException e) {
-            e.printStackTrace();
+        }
+        // 非必选参数可以不使用，并且此处path依旧保存完好，直接在path上操作（可选参数在上述步骤中全部经过clone后操作）
+        if (!toMatch.getParam().isEssential()) {
+            unresolvedInputs.remove(toMatch);//需要解决的头节点的一个输入匹配完成
+            if (unresolvedInputs.isEmpty()) {// 输入全部匹配 = 运行节点匹配完成
+                unresolvedExecutionHeadMap.remove(executionHead);
+                path.getUnresolvedHeadLengthMap().remove(executionHead);
+            }
+            // 递归，完成前置路径
+            this.completeExecutionPath(path, pathSet, compositeLengthLimit);
         }
 
     }
 
 
     // TODO: 选择：若有多种可能，根据一定约束进行选择
+
+
+    // getter & setter
+    public Service getTargetService() {
+        return targetService;
+    }
+
+    public double getSimilarityLimit() {
+        return similarityLimit;
+    }
+
+    public int getRoundLimit() {
+        return roundLimit;
+    }
+
+    public JSONObject getGivenInputs() {
+        return givenInputs;
+    }
 
     @Override
     public String toString() {

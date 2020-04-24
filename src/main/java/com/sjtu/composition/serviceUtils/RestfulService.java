@@ -47,9 +47,13 @@ public class RestfulService implements Service {
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(endpoint);
         for (Parameter requestParam : requestParams) {
             String paramName = requestParam.getName();
-            builder.queryParam(paramName, input.get(paramName));
+            if (input.get(paramName) != null) {
+                builder.queryParam(paramName, input.get(paramName));
+            }
         }
         URI uri = builder.build().encode().toUri();
+        System.out.println(builder.build());
+        System.out.println(uri);
         return restTemplate.getForObject(uri, JSONObject.class);
     }
 
