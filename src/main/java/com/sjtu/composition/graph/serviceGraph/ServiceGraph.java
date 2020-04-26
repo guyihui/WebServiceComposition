@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.sjtu.composition.graph.CompositionSolution;
 import com.sjtu.composition.serviceUtils.Parameter;
 import com.sjtu.composition.serviceUtils.Service;
+import com.sjtu.composition.similarityUtils.SimilarityUtils;
 
 import java.util.*;
 
@@ -44,7 +45,7 @@ public class ServiceGraph {
     private void addDataNode(Set<DataNode> paramDataNodes, DataNode dataNode) {
         similarityMap.put(dataNode, new HashMap<>());
         for (DataNode node : dataNodeSet) {
-            double similarity = this.mockSimilarity(dataNode, node);
+            double similarity = this.getSimilarity(dataNode, node);
             similarityMap.get(node).put(dataNode, similarity);
             similarityMap.get(dataNode).put(node, similarity);
         }
@@ -58,12 +59,11 @@ public class ServiceGraph {
 
     // TODO: 删除/修改服务
 
-    // TODO: 根据词向量模型获取相似度
     // TODO: 同一个服务的输入输出是否需要设置相似度<=0.0，代表不允许语义匹配
-    private double mockSimilarity(DataNode node1, DataNode node2) {
+    private double getSimilarity(DataNode node1, DataNode node2) {
         String word1 = node1.getParam().getDescription();
         String word2 = node2.getParam().getDescription();
-        return word1.equals(word2) ? 1.0 : 0.0;
+        return SimilarityUtils.calculateSimilarity(word1, word2);
     }
 
     // TODO: 搜索新加入服务的组合替换方案（图中不包含）
