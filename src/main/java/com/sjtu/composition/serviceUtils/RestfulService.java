@@ -5,6 +5,7 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
+import java.util.HashSet;
 import java.util.Set;
 
 
@@ -19,6 +20,9 @@ public class RestfulService implements Service {
     private String endpoint;//e.g. http://api.map.baidu.com/place/v2/search
     private RequestType requestType;//e.g. GET
 
+    // 独有属性，不参与匹配，例如 开发key
+    private Set<Parameter> uniqueRequestParams;
+
     // 输入/输出
     private Set<Parameter> requestParams;
     private Set<Parameter> responseParams;
@@ -32,6 +36,20 @@ public class RestfulService implements Service {
         this.requestType = requestType;
         this.requestParams = requestParams;
         this.responseParams = responseParams;
+        this.uniqueRequestParams = new HashSet<>();
+    }
+
+    public RestfulService(Integer id, String name, String description, String endpoint, RequestType requestType,
+                          Set<Parameter> requestParams, Set<Parameter> responseParams,
+                          Set<Parameter> uniqueRequestParams) {
+        this.id = id;
+        this.name = name;
+        this.description = description;
+        this.endpoint = endpoint;
+        this.requestType = requestType;
+        this.requestParams = requestParams;
+        this.responseParams = responseParams;
+        this.uniqueRequestParams = uniqueRequestParams;
     }
 
     //TODO: 检查服务是否可用
@@ -45,6 +63,12 @@ public class RestfulService implements Service {
     //TODO: 执行服务，返回结果
     public JSONObject run(JSONObject input) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(endpoint);
+        for (Parameter param : uniqueRequestParams) {
+            String paramName = param.getName();
+            if (param.getDefaultValue() != null) {
+                builder.queryParam(paramName, param.getDefaultValue());
+            }
+        }
         for (Parameter requestParam : requestParams) {
             String paramName = requestParam.getName();
             if (input.get(paramName) != null) {
@@ -112,6 +136,14 @@ public class RestfulService implements Service {
 
     public void setResponseParams(Set<Parameter> responseParams) {
         this.responseParams = responseParams;
+    }
+
+    public Set<Parameter> getUniqueRequestParams() {
+        return uniqueRequestParams;
+    }
+
+    public void setUniqueRequestParams(Set<Parameter> uniqueRequestParams) {
+        this.uniqueRequestParams = uniqueRequestParams;
     }
 
     @Override

@@ -1,22 +1,29 @@
 package com.sjtu.composition.serviceUtils;
 
 public class Parameter {
-    private String name;//e.g. "query"
-    private String description;//e.g. "检索关键字"
-    private String info;
-    //e.g. "行政区划区域检索不支持多关键字检索。如果需要按POI分类进行检索，请将分类通过query参数进行设置，如query=美食"
-    private boolean isEssential;//e.g. true == 必选
+
+    private String name;// uri参数名 e.g. "query"
+    private String description;// 参数含义 e.g. "检索关键字"
+    private String info;// 补充描述 e.g. "行政区划区域检索不支持多关键字检索。..."
+    private boolean isEssential;
+    private String defaultValue;
+    // private String examples;// 举例
     //TODO:参数类型（string、int……）
     //TODO:与其他参数的依赖关系
-    //TODO:value
-    //TODO:defaultValue
-    //TODO:举例
 
     public Parameter(String name, String description, String info, boolean isEssential) {
         this.name = name;
         this.description = description;
         this.info = info;
         this.isEssential = isEssential;
+    }
+
+    public Parameter(String name, String description, String info, boolean isEssential, String defaultValue) {
+        this.name = name;
+        this.description = description;
+        this.info = info;
+        this.isEssential = isEssential;
+        this.defaultValue = defaultValue;
     }
 
 
@@ -53,4 +60,11 @@ public class Parameter {
         isEssential = essential;
     }
 
+    public String getDefaultValue() {
+        return defaultValue;
+    }
+
+    public void setDefaultValue(String defaultValue) {
+        this.defaultValue = defaultValue;
+    }
 }

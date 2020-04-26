@@ -11,6 +11,8 @@ import com.sjtu.composition.serviceUtils.Service;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.PostConstruct;
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.util.*;
 
 @RestController
@@ -130,6 +132,53 @@ public class SubstitutionController {
         graph.addService(serviceC);
         graph.addService(serviceD);
         graph.addService(serviceE);
+
+
+        try {
+            Scanner scanner = new Scanner(new File("D:\\sjtuProjects\\WebServiceComposition\\src\\main\\resources\\static\\baidu.ak"));
+            String ak = scanner.nextLine();
+
+            Set<Parameter> uniqueInputsBaiduSuggestion = new HashSet<>();
+            uniqueInputsBaiduSuggestion.add(new Parameter("ak", "百度开发key", "", true, ak));
+            uniqueInputsBaiduSuggestion.add(new Parameter("output", "输出格式", "", true, "json"));
+            Set<Parameter> inputsBaiduSuggestion = new HashSet<>();
+            inputsBaiduSuggestion.add(new Parameter("query", "关键词", "", true));
+            inputsBaiduSuggestion.add(new Parameter("region", "地区", "", true));
+            Set<Parameter> outputsBaiduSuggestion = new HashSet<>();
+            outputsBaiduSuggestion.add(new Parameter("result", "结果", "", true));
+            Service serviceBaiduSuggestion = new RestfulService(
+                    11, "地点输入提示V2.0", "百度api",
+                    "http://api.map.baidu.com/place/v2/suggestion", Service.RequestType.GET,
+                    inputsBaiduSuggestion, outputsBaiduSuggestion, uniqueInputsBaiduSuggestion
+            );
+            graph.addService(serviceBaiduSuggestion);
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            Scanner scanner = new Scanner(new File("D:\\sjtuProjects\\WebServiceComposition\\src\\main\\resources\\static\\tencent.key"));
+            String key = scanner.nextLine();
+
+            Set<Parameter> uniqueInputsTencentSuggestion = new HashSet<>();
+            uniqueInputsTencentSuggestion.add(new Parameter("key", "腾讯开发key", "", true, key));
+            Set<Parameter> inputsTencentSuggestion = new HashSet<>();
+            inputsTencentSuggestion.add(new Parameter("keyword", "关键词", "", true));
+            inputsTencentSuggestion.add(new Parameter("region", "地区", "", true));
+            Set<Parameter> outputsTencentSuggestion = new HashSet<>();
+            outputsTencentSuggestion.add(new Parameter("data", "结果", "", true));
+            Service serviceTencentSuggestion = new RestfulService(
+                    12, "关键词输入提示", "腾讯api",
+                    "https://apis.map.qq.com/ws/place/v1/suggestion", Service.RequestType.GET,
+                    inputsTencentSuggestion, outputsTencentSuggestion, uniqueInputsTencentSuggestion
+            );
+            graph.addService(serviceTencentSuggestion);
+
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
         System.out.println(graph);
 
     }
@@ -156,7 +205,11 @@ public class SubstitutionController {
 
     @PostMapping(value = "/substitution/{serviceId}", produces = "application/json;charset=UTF-8")
     public JSONObject substitute(@PathVariable("serviceId") int serviceId, @RequestBody JSONObject inputArgs) {
-        Service targetService = graph.getServiceNodeMap().get(serviceId).getService();
+        ServiceNode targetServiceNode = graph.getServiceNodeMap().get(serviceId);
+        if (targetServiceNode == null) {
+            return null;//TODO:构造对应的返回json
+        }
+        Service targetService = targetServiceNode.getService();
 
         CompositionSolution solution = new CompositionSolution(
                 targetService,
