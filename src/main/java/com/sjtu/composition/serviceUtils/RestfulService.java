@@ -1,6 +1,9 @@
 package com.sjtu.composition.serviceUtils;
 
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.support.spring.FastJsonHttpMessageConverter;
+import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -57,8 +60,19 @@ public class RestfulService implements Service {
         return true;
     }
 
-    //TODO: 每个service一个template会不会有影响？rest template可能需要设置其他参数，不可能单例
+    //TODO: 每个service一个template会不会有影响？rest template可能需要设置其他参数，不一定单例
     private RestTemplate restTemplate = new RestTemplate();
+
+    { // 处理text/javascript
+        MappingJackson2HttpMessageConverter jsonConverter = null;
+        for (HttpMessageConverter<?> converter : restTemplate.getMessageConverters()) {
+            if (converter instanceof MappingJackson2HttpMessageConverter) {
+                jsonConverter = (MappingJackson2HttpMessageConverter) converter;
+            }
+        }
+        restTemplate.getMessageConverters().remove(jsonConverter);
+        restTemplate.getMessageConverters().add(new FastJsonHttpMessageConverter());
+    }
 
     //TODO: 执行服务，返回结果
     public JSONObject run(JSONObject input) {
