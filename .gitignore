@@ -29,5 +29,6 @@ build/
 
 ### VS Code ###
 .vscode/
-src/main/resources/static/baidu.ak
-src/main/resources/static/tencent.key
+
+### others ###
+src/main/resources/static/

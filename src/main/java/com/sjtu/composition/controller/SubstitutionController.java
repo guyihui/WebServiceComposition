@@ -135,7 +135,7 @@ public class SubstitutionController {
 
 
         try {
-            Scanner scanner = new Scanner(new File("D:\\sjtuProjects\\WebServiceComposition\\src\\main\\resources\\static\\baidu.ak"));
+            Scanner scanner = new Scanner(new File("D:\\sjtuProjects\\WebServiceComposition\\src\\main\\resources\\static\\baidu.key"));
             String ak = scanner.nextLine();
 
             Set<Parameter> uniqueInputsBaiduSuggestion = new HashSet<>();
