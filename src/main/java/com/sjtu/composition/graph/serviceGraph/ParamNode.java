@@ -2,7 +2,7 @@ package com.sjtu.composition.graph.serviceGraph;
 
 import com.sjtu.composition.serviceUtils.Parameter;
 
-public class DataNode {
+public class ParamNode {
     public enum Type {
         INPUT, OUTPUT,
     }
@@ -11,7 +11,7 @@ public class DataNode {
     private Parameter param;
     private ServiceNode serviceNode;
 
-    public DataNode(Type type, Parameter param, ServiceNode serviceNode) {
+    public ParamNode(Type type, Parameter param, ServiceNode serviceNode) {
         this.type = type;
         this.param = param;
         this.serviceNode = serviceNode;

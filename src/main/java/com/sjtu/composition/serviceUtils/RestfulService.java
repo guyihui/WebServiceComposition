@@ -8,56 +8,57 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.util.HashSet;
-import java.util.Set;
-
+import java.util.*;
 
 public class RestfulService implements Service {
 
     // 服务描述信息：id、服务名、功能描述...
-    private int id;//e.g.0?
+    private int id = -1;//e.g.0?
     private String name;//e.g.行政区划区域检索
     private String description;
 
     // 服务访问：url，操作类型...
     private String endpoint;//e.g. http://api.map.baidu.com/place/v2/search
-    private RequestType requestType;//e.g. GET
+    private Operation operation;//e.g. GET
+
+    // TODO: QoS
 
     // 独有属性，不参与匹配，例如 开发key
     private Set<Parameter> uniqueRequestParams;
 
     // 输入/输出
-    private Set<Parameter> requestParams;
+    private Set<Parameter> requestParams;// path | query | body
     private Set<Parameter> responseParams;
 
-    public RestfulService(Integer id, String name, String description, String endpoint, RequestType requestType,
+    //TODO: 保存参数的嵌套结构(type:object)
+
+    public RestfulService(String name, String description, String endpoint, Operation operation,
                           Set<Parameter> requestParams, Set<Parameter> responseParams) {
-        this.id = id;
-        this.name = name;
-        this.description = description;
-        this.endpoint = endpoint;
-        this.requestType = requestType;
-        this.requestParams = requestParams;
-        this.responseParams = responseParams;
-        this.uniqueRequestParams = new HashSet<>();
+        this(name, description, endpoint, operation, requestParams, responseParams, new HashSet<>());
     }
 
-    public RestfulService(Integer id, String name, String description, String endpoint, RequestType requestType,
+    public RestfulService(String name, String description, String endpoint, Operation operation,
                           Set<Parameter> requestParams, Set<Parameter> responseParams,
                           Set<Parameter> uniqueRequestParams) {
-        this.id = id;
         this.name = name;
         this.description = description;
         this.endpoint = endpoint;
-        this.requestType = requestType;
+        this.operation = operation;
         this.requestParams = requestParams;
         this.responseParams = responseParams;
         this.uniqueRequestParams = uniqueRequestParams;
     }
 
-    //TODO: 检查服务是否可用
-    public boolean isAvailable() {
-        return true;
+    public void authorize(String keyParamName, String keyText, Parameter.ParamCategory category) {
+        Parameter<String> keyParam = new Parameter<>(
+                keyParamName,
+                category,
+                null,
+                true,
+                Parameter.ParamType.STRING
+        );
+        keyParam.setDefaultValue(keyText);
+        this.uniqueRequestParams.add(keyParam);
     }
 
     //TODO: 每个service一个template会不会有影响？rest template可能需要设置其他参数，不一定单例
@@ -74,9 +75,12 @@ public class RestfulService implements Service {
         restTemplate.getMessageConverters().add(new FastJsonHttpMessageConverter());
     }
 
-    //TODO: 执行服务，返回结果
-    public JSONObject run(JSONObject input) {
+    //TODO: request body
+    //      POST, PUT, DELETE
+    public JSONObject run(Map<Parameter, Object> matches) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(endpoint);
+        Map<String, Object> uriVariableMap = new HashMap<>();//path
+
         for (Parameter param : uniqueRequestParams) {
             String paramName = param.getName();
             if (param.getDefaultValue() != null) {
@@ -84,15 +88,48 @@ public class RestfulService implements Service {
             }
         }
         for (Parameter requestParam : requestParams) {
-            String paramName = requestParam.getName();
-            if (input.get(paramName) != null) {
-                builder.queryParam(paramName, input.get(paramName));
+            Object paramValue = matches.get(requestParam);
+            switch (requestParam.getParamCategory()) {
+                case PATH:
+                    uriVariableMap.put(requestParam.getName(), paramValue);
+                    break;
+                case QUERY:
+                    if (paramValue != null) {
+                        builder.queryParam(requestParam.getName(), paramValue);
+                    }
+                    break;
+                case BODY:
+                default:
             }
         }
-        URI uri = builder.build().encode().toUri();
+        System.out.println("!!!!!!!!!");
+        System.out.println(uriVariableMap);
+        System.out.println(builder.build());
+        URI uri = builder
+                .build()
+//                .expand(uriVariableMap)
+                .encode()
+                .toUri();
         System.out.println(builder.build());
         System.out.println(uri);
-        return restTemplate.getForObject(uri, JSONObject.class);
+        switch (this.operation) {
+            case GET:
+                JSONObject jsonObject = restTemplate.getForObject(uri, JSONObject.class);
+                if (jsonObject == null) {
+                    return null;
+                }
+                for (Parameter responseParam : responseParams) {
+                    String paramName = responseParam.getName();
+                    Object paramValue = jsonObject.get(paramName);
+                    matches.put(responseParam, paramValue);
+                }
+                return jsonObject;
+            case POST:
+            case PUT:
+            case DELETE:
+            default:
+        }
+        return null;
     }
 
     //getter & setter
@@ -128,12 +165,20 @@ public class RestfulService implements Service {
         this.endpoint = endpoint;
     }
 
-    public RequestType getRequestType() {
-        return requestType;
+    public Operation getOperation() {
+        return operation;
     }
 
-    public void setRequestType(RequestType requestType) {
-        this.requestType = requestType;
+    public void setOperation(Operation operation) {
+        this.operation = operation;
+    }
+
+    public Set<Parameter> getUniqueRequestParams() {
+        return uniqueRequestParams;
+    }
+
+    public void setUniqueRequestParams(Set<Parameter> uniqueRequestParams) {
+        this.uniqueRequestParams = uniqueRequestParams;
     }
 
     public Set<Parameter> getRequestParams() {
@@ -152,16 +197,8 @@ public class RestfulService implements Service {
         this.responseParams = responseParams;
     }
 
-    public Set<Parameter> getUniqueRequestParams() {
-        return uniqueRequestParams;
-    }
-
-    public void setUniqueRequestParams(Set<Parameter> uniqueRequestParams) {
-        this.uniqueRequestParams = uniqueRequestParams;
-    }
-
     @Override
     public String toString() {
-        return "[" + name + "]" + "{" + description + "}";
+        return id + ":[" + name + "]" + "(" + endpoint + ")" + "{" + description + "}";
     }
 }

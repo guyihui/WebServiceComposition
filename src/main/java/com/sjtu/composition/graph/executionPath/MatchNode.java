@@ -1,12 +1,12 @@
 package com.sjtu.composition.graph.executionPath;
 
-import com.sjtu.composition.graph.serviceGraph.DataNode;
+import com.sjtu.composition.graph.serviceGraph.ParamNode;
 
 public class MatchNode implements ExecutionPathNode {
-    private DataNode matchSourceNode;
-    private DataNode matchTargetNode;
+    private ParamNode matchSourceNode;
+    private ParamNode matchTargetNode;
 
-    public MatchNode(DataNode matchSourceNode, DataNode matchTargetNode) {
+    public MatchNode(ParamNode matchSourceNode, ParamNode matchTargetNode) {
         this.matchSourceNode = matchSourceNode;
         this.matchTargetNode = matchTargetNode;
     }
@@ -17,11 +17,11 @@ public class MatchNode implements ExecutionPathNode {
                 && this.matchTargetNode == other.matchTargetNode;
     }
 
-    public DataNode getMatchSourceNode() {
+    public ParamNode getMatchSourceNode() {
         return matchSourceNode;
     }
 
-    public DataNode getMatchTargetNode() {
+    public ParamNode getMatchTargetNode() {
         return matchTargetNode;
     }
 

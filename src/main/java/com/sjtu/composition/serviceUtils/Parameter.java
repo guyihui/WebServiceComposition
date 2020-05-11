@@ -1,29 +1,38 @@
 package com.sjtu.composition.serviceUtils;
 
-public class Parameter {
+public class Parameter<T> {
 
-    private String name;// uri参数名 e.g. "query"
-    private String description;// 参数含义 e.g. "检索关键字"
-    private String info;// 补充描述 e.g. "行政区划区域检索不支持多关键字检索。..."
-    private boolean isEssential;
-    private String defaultValue;
-    // private String examples;// 举例
-    //TODO:参数类型（string、int……）
-    //TODO:与其他参数的依赖关系
-
-    public Parameter(String name, String description, String info, boolean isEssential) {
-        this.name = name;
-        this.description = description;
-        this.info = info;
-        this.isEssential = isEssential;
+    public enum ParamCategory {
+        PATH, QUERY, BODY,
+        RESPONSE,
     }
 
-    public Parameter(String name, String description, String info, boolean isEssential, String defaultValue) {
+    public enum ParamType {
+        STRING,
+        INTEGER, NUMBER,
+        BOOLEAN,
+        OBJECT,
+        ARRAY,
+        //TODO: enum , format , object schema
+    }
+
+    private String name;        // *uri参数名 | e.g. "query"(=/:)
+    private ParamCategory paramCategory;// *传参类型 | e.g. QUERY == "?xxx=xxx"
+    private String description; // *参数含义 | e.g. "检索关键字"
+    private boolean isRequired; // *是否必选
+    private ParamType paramType;// *参数类型
+
+    private String info;        //  补充描述 | e.g. "行政区划区域检索不支持多关键字检索。..."
+    private T defaultValue;
+//    private List<JSONObject> examples;// 举例
+    //TODO:与其他参数的依赖关系
+
+    public Parameter(String name, ParamCategory paramCategory, String description, boolean isRequired, ParamType paramType) {
         this.name = name;
+        this.paramCategory = paramCategory;
         this.description = description;
-        this.info = info;
-        this.isEssential = isEssential;
-        this.defaultValue = defaultValue;
+        this.isRequired = isRequired;
+        this.paramType = paramType;
     }
 
 
@@ -34,6 +43,14 @@ public class Parameter {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public ParamCategory getParamCategory() {
+        return paramCategory;
+    }
+
+    public void setParamCategory(ParamCategory paramCategory) {
+        this.paramCategory = paramCategory;
     }
 
     public String getDescription() {
@@ -52,19 +69,28 @@ public class Parameter {
         this.info = info;
     }
 
-    public boolean isEssential() {
-        return isEssential;
+    public boolean isRequired() {
+        return isRequired;
     }
 
-    public void setEssential(boolean essential) {
-        isEssential = essential;
+    public void setRequired(boolean required) {
+        isRequired = required;
     }
 
-    public String getDefaultValue() {
+    public ParamType getParamType() {
+        return paramType;
+    }
+
+    public void setParamType(ParamType paramType) {
+        this.paramType = paramType;
+    }
+
+    public T getDefaultValue() {
         return defaultValue;
     }
 
-    public void setDefaultValue(String defaultValue) {
+    public void setDefaultValue(T defaultValue) {
         this.defaultValue = defaultValue;
     }
+
 }

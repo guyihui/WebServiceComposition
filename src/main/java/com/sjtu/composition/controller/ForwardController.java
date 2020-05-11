@@ -2,83 +2,80 @@ package com.sjtu.composition.controller;
 
 import com.alibaba.fastjson.JSONObject;
 import com.sjtu.composition.serviceUtils.Parameter;
-import com.sjtu.composition.serviceUtils.RestfulService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
+import com.sjtu.composition.serviceUtils.Service;
+import com.sjtu.composition.serviceUtils.ServiceRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.util.Assert;
+import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.PostConstruct;
-import java.net.URI;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 @RestController
 public class ForwardController {
 
-    private static final Map<Integer, RestfulService> serviceMap = new HashMap<>();
+    private ServiceRepository serviceRepository;
 
-    @PostConstruct
-    public void init() {
-        Parameter query = new Parameter(
-                "query",
-                "检索关键字",
-                "行政区划区域检索不支持多关键字检索。\n如果需要按POI分类进行检索，请将分类通过query参数进行设置，如query=美食",
-                true
-        );
-        Parameter region = new Parameter(
-                "region",
-                "检索行政区划区域",
-                "（增加区域内数据召回权重，如需严格限制召回数据在区域内，请搭配使用city_limit参数），可输入行政区划名或对应cityCode",
-                true
-        );
-        Parameter ak = new Parameter(
-                "ak",
-                "开发者的访问密钥",
-                "开发者的访问密钥，必填项。v2之前该属性为key。",
-                true
-        );
-
-        Set<Parameter> requestParams = new HashSet<>();
-        requestParams.add(query);
-        requestParams.add(region);
-        requestParams.add(ak);
-
-        RestfulService restfulService = new RestfulService(
-                0,
-                "行政区划区域检索",
-                "地点检索服务（又名Place API）是一类Web API接口服务；\n" +
-                        "服务提供多种场景的地点（POI）检索功能，包括城市检索、圆形区域检索、矩形区域检索。开发者可通过接口获取地点（POI）基础或详细地理信息。\n" +
-                        "注意：地点检索服务适用于【XX大厦】、【XX小区】等POI地点名称的检索，若需要检索结构化地址，如【北京市海淀区上地十街十号】，则推荐使用地理编码服务。",
-                "http://api.map.baidu.com/place/v2/search",
-                RestfulService.RequestType.GET,
-                requestParams,
-                new HashSet<>()
-        );
-
-        serviceMap.put(0, restfulService);
-
+    @Autowired
+    public ForwardController(@Qualifier("serviceRepository") ServiceRepository serviceRepository) {
+        Assert.notNull(serviceRepository, "service repository must not be null");
+        this.serviceRepository = serviceRepository;
     }
 
-    @GetMapping("/forward/{serviceId}")
-    public String forward(@PathVariable("serviceId") int serviceId) {
-        return "???";
+    @PostMapping(value = "/forward/{serviceId}", produces = "application/json;charset=UTF-8")
+    public JSONObject forward(@PathVariable("serviceId") int serviceId, @RequestBody JSONObject inputArgs) {
+        JSONObject result = new JSONObject();
+        result.put("status", -1);
+        // forward to
+        Service service = serviceRepository.getServiceById(serviceId);
+        if (service != null) {
+            result.put("service", service.toString());
+        } else {
+            result.put("message", "invalid service");
+            return result;
+        }
+        // args
+        Map<Parameter, Object> inputMap = new HashMap<>();
+        JSONObject pathArgs = inputArgs.getJSONObject("path");
+        JSONObject queryArgs = inputArgs.getJSONObject("query");
+        JSONObject bodyArgs = inputArgs.getJSONObject("body");
+        try {
+            for (Parameter parameter : service.getRequestParams()) {
+                JSONObject argsJSONObject;
+                switch (parameter.getParamCategory()) {
+                    case PATH:
+                        argsJSONObject = pathArgs;
+                        break;
+                    case QUERY:
+                        argsJSONObject = queryArgs;
+                        break;
+                    case BODY:
+                        argsJSONObject = bodyArgs;
+                        break;
+                    default:
+                        result.put("message", "invalid service param");
+                        return result;
+                }
+                if (argsJSONObject == null || argsJSONObject.get(parameter.getName()) == null) {
+                    if (parameter.isRequired()) {
+                        throw new Exception("missing " + parameter.getParamCategory() + " param: " + parameter.getName());
+                    }
+                } else {
+                    inputMap.put(parameter, argsJSONObject.get(parameter.getName()));
+                }
+            }
+            result.put("forward_result", service.run(inputMap));
+
+        } catch (Exception e) {
+            result.put("message", e.toString());
+            return result;
+        }
+
+        result.put("status", 0);
+        result.put("message", "success");
+        return result;
     }
 
 
-    private RestTemplate restTemplate = new RestTemplate();
-
-    @GetMapping("/restTemplate")
-    public JSONObject restTemplate() {
-
-        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl("http://localhost:8080/satellite");
-        URI uri = builder
-                .queryParam("location", "食堂")
-                .build().encode().toUri();
-        JSONObject object = restTemplate.getForObject(uri, JSONObject.class);
-        return object;
-    }
 }

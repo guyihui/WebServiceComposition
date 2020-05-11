@@ -2,8 +2,9 @@ package com.sjtu.composition.graph.executionPath;
 
 import com.alibaba.fastjson.JSONObject;
 import com.sjtu.composition.graph.CompositionSolution;
-import com.sjtu.composition.graph.serviceGraph.DataNode;
+import com.sjtu.composition.graph.serviceGraph.ParamNode;
 import com.sjtu.composition.graph.serviceGraph.ServiceNode;
+import com.sjtu.composition.serviceUtils.Parameter;
 import com.sjtu.composition.serviceUtils.Service;
 
 import java.util.*;
@@ -16,7 +17,7 @@ public class ExecutionPath implements Cloneable {
     private Map<ExecutionPathNode, Set<ExecutionPathNode>> pathMap = new HashMap<>();//连接边
     private Map<ExecutionNode, Set<MatchNode>> preMatchNodes = new HashMap<>();//每个运行节点需要的前置matchNode
     // 提取过程中的辅助数据结构
-    private volatile Map<ExecutionNode, Set<DataNode>> unresolvedExecutionHeads = new HashMap<>();//<需要匹配的头节点，其需要匹配的输入>
+    private volatile Map<ExecutionNode, Set<ParamNode>> unresolvedExecutionHeads = new HashMap<>();//<需要匹配的头节点，其需要匹配的输入>
     private volatile Map<ExecutionNode, Integer> unresolvedHeadLength = new HashMap<>();//待匹配节点之后的路径长度
     // TODO: 保存path参数，用于path间的比较选择（需要clone）
     // 例如：服务数量、组合长度、涉及到的服务的集合、QoS……
@@ -27,7 +28,7 @@ public class ExecutionPath implements Cloneable {
 
 
     public ExecutionPath(CompositionSolution solution) {
-        Set<DataNode> toMatchSet = new HashSet<>(solution.getTargetServiceNode().getOutputs());
+        Set<ParamNode> toMatchSet = new HashSet<>(solution.getTargetOutput());
         unresolvedExecutionHeads.put(END_NODE, toMatchSet);
         unresolvedHeadLength.put(END_NODE, 0);
     }
@@ -153,25 +154,21 @@ public class ExecutionPath implements Cloneable {
         System.out.println(this);
         System.out.println("**** Run ****");
         System.out.println("Args:" + args);
-
         matchArgs = new HashMap<>();
         nextExecutions = new HashSet<>();
-
         // 初始输入 args 作为 START_NODE 的输出
         // 把实际参数和 matchNode 对应起来
         this.saveOutputMatch(args, START_NODE);
-
         return this.recursiveExecute();
-
     }
 
     private void saveOutputMatch(JSONObject args, ExecutionNode executed) {
         Set<ExecutionPathNode> matchNodes = pathMap.get(executed);
         for (ExecutionPathNode node : matchNodes) {
             MatchNode matchNode = (MatchNode) node;
-            DataNode sourceDataNode = matchNode.getMatchSourceNode();
+            ParamNode sourceParamNode = matchNode.getMatchSourceNode();
             // 保存对应关系和实际参数
-            matchArgs.put(matchNode, args.get(sourceDataNode.getParam().getName()));
+            matchArgs.put(matchNode, args.get(sourceParamNode.getParam().getName()));
             // 后续的 execution 放入 nextExecutions 中
             nextExecutions.addAll(pathMap.get(node));
         }
@@ -197,15 +194,15 @@ public class ExecutionPath implements Cloneable {
                 Service service = serviceNode.getService();
                 // 1. 处理输入
                 // 对于每个 matchNode，找到其对应调用参数
-                JSONObject input = new JSONObject();//实际调用参数
+                Map<Parameter, Object> input = new HashMap<>();//实际调用参数
                 for (MatchNode matchNode : requiredInputMatches) {
-                    DataNode requiredArgNode = matchNode.getMatchTargetNode();
-                    input.put(requiredArgNode.getParam().getName(), matchArgs.get(matchNode));
+                    ParamNode requiredArgNode = matchNode.getMatchTargetNode();
+                    input.put(requiredArgNode.getParam(), matchArgs.get(matchNode));
                 }
                 // 2. 执行，移出 nextExecutions
                 // inputs构造完毕，调用服务，得到输出
-                nextExecutions.remove(pathNode);
                 JSONObject output = service.run(input);
+                nextExecutions.remove(pathNode);
                 // 3. 处理输出
                 // 输出存入 matchArgs，并找出后续 execution
                 this.saveOutputMatch(output, executionNode);
@@ -215,7 +212,7 @@ public class ExecutionPath implements Cloneable {
         return this.recursiveExecute();
     }
 
-    public Map<ExecutionNode, Set<DataNode>> getUnresolvedExecutionHeads() {
+    public Map<ExecutionNode, Set<ParamNode>> getUnresolvedExecutionHeads() {
         return unresolvedExecutionHeads;
     }
 
@@ -244,10 +241,10 @@ public class ExecutionPath implements Cloneable {
         }
         // 复制尚未匹配的节点map
         clone.unresolvedExecutionHeads = new HashMap<>();
-        for (Map.Entry<ExecutionNode, Set<DataNode>> entry : this.unresolvedExecutionHeads.entrySet()) {
+        for (Map.Entry<ExecutionNode, Set<ParamNode>> entry : this.unresolvedExecutionHeads.entrySet()) {
             ExecutionNode key = entry.getKey();
-            Set<DataNode> value = entry.getValue();
-            Set<DataNode> cloneValue = new HashSet<>(value);
+            Set<ParamNode> value = entry.getValue();
+            Set<ParamNode> cloneValue = new HashSet<>(value);
             clone.unresolvedExecutionHeads.put(key, cloneValue);
         }
         // 复制待匹配节点之后的路径长度

@@ -1,18 +1,21 @@
 package com.sjtu.composition.serviceUtils;
 
-
 import com.alibaba.fastjson.JSONObject;
 
+import java.util.Map;
 import java.util.Set;
 
 public interface Service {
-    enum RequestType {
+    enum Operation {
         GET, POST, PUT, DELETE
     }
 
-    boolean isAvailable();
+    //TODO: 检查服务是否可用
+    default boolean isAvailable() {
+        return true;
+    }
 
-    JSONObject run(JSONObject input);
+    JSONObject run(Map<Parameter, Object> input);
 
     //getter & setter
     int getId();
@@ -31,9 +34,13 @@ public interface Service {
 
     void setEndpoint(String endpoint);
 
-    RequestType getRequestType();
+    Operation getOperation();
 
-    void setRequestType(RequestType requestType);
+    void setOperation(Operation operation);
+
+    Set<Parameter> getUniqueRequestParams();
+
+    void setUniqueRequestParams(Set<Parameter> uniqueRequestParams);
 
     Set<Parameter> getRequestParams();
 

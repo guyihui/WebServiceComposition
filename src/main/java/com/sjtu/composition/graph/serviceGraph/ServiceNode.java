@@ -6,26 +6,26 @@ import java.util.Set;
 
 public class ServiceNode {
     private Service service;
-    private Set<DataNode> inputs;
-    private Set<DataNode> outputs;
+    private Set<ParamNode> inputs;
+    private Set<ParamNode> outputs;
 
     public ServiceNode(Service service) {
         this.service = service;
     }
 
-    public Set<DataNode> getInputs() {
+    public Set<ParamNode> getInputs() {
         return inputs;
     }
 
-    public void setInputs(Set<DataNode> inputs) {
+    public void setInputs(Set<ParamNode> inputs) {
         this.inputs = inputs;
     }
 
-    public Set<DataNode> getOutputs() {
+    public Set<ParamNode> getOutputs() {
         return outputs;
     }
 
-    public void setOutputs(Set<DataNode> outputs) {
+    public void setOutputs(Set<ParamNode> outputs) {
         this.outputs = outputs;
     }
 
