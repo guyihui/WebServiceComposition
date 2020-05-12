@@ -15,6 +15,8 @@ public interface Service {
         return true;
     }
 
+    int getResponseTime();
+
     JSONObject run(Map<Parameter, Object> input);
 
     //getter & setter

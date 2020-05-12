@@ -8,6 +8,8 @@ public class ServiceNode {
     private Service service;
     private Set<ParamNode> inputs;
     private Set<ParamNode> outputs;
+    // QoS信息(执行开始时)
+    private int responseTimeFloor = Integer.MAX_VALUE;
 
     public ServiceNode(Service service) {
         this.service = service;
@@ -35,6 +37,14 @@ public class ServiceNode {
 
     public void setService(Service service) {
         this.service = service;
+    }
+
+    public int getResponseTimeFloor() {
+        return responseTimeFloor;
+    }
+
+    public void setResponseTimeFloor(int responseTimeFloor) {
+        this.responseTimeFloor = responseTimeFloor;
     }
 
     @Override

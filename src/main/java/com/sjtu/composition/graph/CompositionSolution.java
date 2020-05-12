@@ -15,19 +15,21 @@ public class CompositionSolution extends ServiceGraph {
     private JSONObject givenInputs;
     //TODO:指定输出中需要获取的部分，而不是全部输出匹配
 
-    public CompositionSolution(Service targetService, Set<Service> serviceCluster,
+    public CompositionSolution(Service targetService, //JSONObject givenInputs,
+                               Set<Service> serviceCluster,
                                SimilarityUtils similarityUtils) {
         super(targetService, serviceCluster, similarityUtils);
-    }
 
-    public boolean build(double similarityLimit, int layerLimit) {
-        this.isResolved = super.build(similarityLimit, layerLimit);
-        return isResolved;
     }
 
     // 方案结果属性
     public boolean isResolved = false;//TODO:对应原因
     public int round;
+
+    public boolean build(double similarityLimit, int layerLimit) {
+        this.isResolved = super.build(similarityLimit, layerLimit);
+        return isResolved;
+    }
 
     // 提取：得到无歧义/多余路径的实际执行路径（可能存在多种）
     // 返回完整的set
@@ -143,7 +145,8 @@ public class CompositionSolution extends ServiceGraph {
     }
 
 
-    // TODO: 选择：若有多种可能，根据一定约束进行选择
+    //TODO: 选择：若有多种可能，根据一定约束进行选择
+    // QoS bound ...
 
 
     // getter & setter

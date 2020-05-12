@@ -7,14 +7,35 @@ public class ParamNode {
         INPUT, OUTPUT,
     }
 
-    public Type type;
+    // 图结构信息
+    private Type type;
     private Parameter param;
     private ServiceNode serviceNode;
+    // QoS信息
+    private int responseTimeFloor = Integer.MAX_VALUE;
 
     public ParamNode(Type type, Parameter param, ServiceNode serviceNode) {
         this.type = type;
         this.param = param;
         this.serviceNode = serviceNode;
+    }
+
+
+    // getter & setter
+    public Type getType() {
+        return type;
+    }
+
+    public void setType(Type type) {
+        this.type = type;
+    }
+
+    public Parameter getParam() {
+        return param;
+    }
+
+    public void setParam(Parameter param) {
+        this.param = param;
     }
 
     public ServiceNode getServiceNode() {
@@ -25,12 +46,12 @@ public class ParamNode {
         this.serviceNode = serviceNode;
     }
 
-    public Parameter getParam() {
-        return param;
+    public int getResponseTimeFloor() {
+        return responseTimeFloor;
     }
 
-    public void setParam(Parameter param) {
-        this.param = param;
+    public void setResponseTimeFloor(int responseTimeFloor) {
+        this.responseTimeFloor = responseTimeFloor;
     }
 
     @Override

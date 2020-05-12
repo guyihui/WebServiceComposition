@@ -58,7 +58,7 @@ public class ServiceRepository {
         Set<Parameter> responseParams = new HashSet<>();
         responseParams.add(new Parameter<String>("photo", Parameter.ParamCategory.RESPONSE, "照片", true, Parameter.ParamType.STRING));
         responseParams.add(new Parameter<String>("temperature", Parameter.ParamCategory.RESPONSE, "温度", true, Parameter.ParamType.STRING));
-        return new RestfulService("卫星拍摄", "给定定位坐标，获取对应的照片和温度",
+        return new RestfulService("卫星拍摄", "给定定位坐标，获取对应的照片和温度", 200,
                 "http://localhost:8080/satellite", Service.Operation.GET, requestParams, responseParams
         );
     }
@@ -68,7 +68,7 @@ public class ServiceRepository {
         requestParams.add(new Parameter<String>("location", Parameter.ParamCategory.QUERY, "定位", true, Parameter.ParamType.STRING));
         Set<Parameter> responseParams = new HashSet<>();
         responseParams.add(new Parameter<String>("temperature", Parameter.ParamCategory.RESPONSE, "温度", true, Parameter.ParamType.STRING));
-        return new RestfulService("温度服务", "获取某地的温度",
+        return new RestfulService("温度服务", "获取某地的温度", 100,
                 "http://localhost:8080/temperature", Service.Operation.GET, requestParams, responseParams
         );
     }
@@ -79,7 +79,7 @@ public class ServiceRepository {
         Set<Parameter> responseParams = new HashSet<>();
         responseParams.add(new Parameter<String>("longitude", Parameter.ParamCategory.RESPONSE, "经度", true, Parameter.ParamType.STRING));
         responseParams.add(new Parameter<String>("latitude", Parameter.ParamCategory.RESPONSE, "纬度", true, Parameter.ParamType.STRING));
-        return new RestfulService("经纬度", "地址转换为经纬度坐标",
+        return new RestfulService("经纬度", "地址转换为经纬度坐标", 80,
                 "http://localhost:8080/gps", Service.Operation.GET, requestParams, responseParams
         );
     }
@@ -91,7 +91,7 @@ public class ServiceRepository {
         requestParams.add(new Parameter<String>("alternative", Parameter.ParamCategory.QUERY, "任意文本", false, Parameter.ParamType.STRING));
         Set<Parameter> responseParams = new HashSet<>();
         responseParams.add(new Parameter<String>("photo", Parameter.ParamCategory.RESPONSE, "照片", true, Parameter.ParamType.STRING));
-        return new RestfulService("经纬度拍照", "根据GPS坐标，获取实时照片",
+        return new RestfulService("经纬度拍照", "根据GPS坐标，获取实时照片", 150,
                 "http://localhost:8080/photo", Service.Operation.GET, requestParams, responseParams
         );
     }
@@ -101,7 +101,7 @@ public class ServiceRepository {
         requestParams.add(new Parameter<String>("location", Parameter.ParamCategory.QUERY, "定位", true, Parameter.ParamType.STRING));
         Set<Parameter> responseParams = new HashSet<>();
         responseParams.add(new Parameter<String>("longitude", Parameter.ParamCategory.RESPONSE, "经度", true, Parameter.ParamType.STRING));
-        return new RestfulService("获取经度", "得到某地的经度",
+        return new RestfulService("获取经度", "得到某地的经度", 100,
                 "http://localhost:8080/longitude", Service.Operation.GET, requestParams, responseParams
         );
     }
@@ -111,7 +111,7 @@ public class ServiceRepository {
         requestParams.add(new Parameter<String>("longitude", Parameter.ParamCategory.QUERY, "经度", true, Parameter.ParamType.STRING));
         Set<Parameter> responseParams = new HashSet<>();
         responseParams.add(new Parameter<String>("timezone", Parameter.ParamCategory.RESPONSE, "时区", true, Parameter.ParamType.STRING));
-        return new RestfulService("时区服务", "得到某地的时区",
+        return new RestfulService("时区服务", "得到某地的时区", 200,
                 "http://localhost:8080/timezone", Service.Operation.GET, requestParams, responseParams
         );
     }
@@ -132,7 +132,8 @@ public class ServiceRepository {
         outputFormatParam.setDefaultValue("json");
         uniqueParams.add(outputFormatParam);
         // service
-        RestfulService service = new RestfulService("地点输入提示", "描述",
+        RestfulService service = new RestfulService(
+                "地点输入提示", "描述", 200,
                 "http://api.map.baidu.com/place/v2/suggestion",
                 Service.Operation.GET, requestParams, responseParams, uniqueParams
         );
@@ -157,7 +158,7 @@ public class ServiceRepository {
         Set<Parameter> uniqueParams = new HashSet<>();
         // service
         RestfulService service = new RestfulService("关键词输入提示",
-                "用于获取输入关键字的补完与提示，帮助用户快速输入。",
+                "用于获取输入关键字的补完与提示，帮助用户快速输入。", 180,
                 "https://apis.map.qq.com/ws/place/v1/suggestion",
                 Service.Operation.GET, requestParams, responseParams, uniqueParams
         );

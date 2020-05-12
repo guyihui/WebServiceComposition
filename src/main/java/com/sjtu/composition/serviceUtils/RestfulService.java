@@ -21,7 +21,8 @@ public class RestfulService implements Service {
     private String endpoint;//e.g. http://api.map.baidu.com/place/v2/search
     private Operation operation;//e.g. GET
 
-    // TODO: QoS
+    // TODO: 其他QoS度量（吞吐量等）
+    private int responseTime;
 
     // 独有属性，不参与匹配，例如 开发key
     private Set<Parameter> uniqueRequestParams;
@@ -32,16 +33,19 @@ public class RestfulService implements Service {
 
     //TODO: 保存参数的嵌套结构(type:object)
 
-    public RestfulService(String name, String description, String endpoint, Operation operation,
+    public RestfulService(String name, String description, int responseTime,
+                          String endpoint, Operation operation,
                           Set<Parameter> requestParams, Set<Parameter> responseParams) {
-        this(name, description, endpoint, operation, requestParams, responseParams, new HashSet<>());
+        this(name, description, responseTime, endpoint, operation, requestParams, responseParams, new HashSet<>());
     }
 
-    public RestfulService(String name, String description, String endpoint, Operation operation,
+    public RestfulService(String name, String description, int responseTime,
+                          String endpoint, Operation operation,
                           Set<Parameter> requestParams, Set<Parameter> responseParams,
                           Set<Parameter> uniqueRequestParams) {
         this.name = name;
         this.description = description;
+        this.responseTime = responseTime;
         this.endpoint = endpoint;
         this.operation = operation;
         this.requestParams = requestParams;
@@ -79,7 +83,7 @@ public class RestfulService implements Service {
     //      POST, PUT, DELETE
     public JSONObject run(Map<Parameter, Object> matches) {
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(endpoint);
-        Map<String, Object> uriVariableMap = new HashMap<>();//path
+//        Map<String, Object> uriVariableMap = new HashMap<>();//path
 
         for (Parameter param : uniqueRequestParams) {
             String paramName = param.getName();
@@ -91,7 +95,7 @@ public class RestfulService implements Service {
             Object paramValue = matches.get(requestParam);
             switch (requestParam.getParamCategory()) {
                 case PATH:
-                    uriVariableMap.put(requestParam.getName(), paramValue);
+//                    uriVariableMap.put(requestParam.getName(), paramValue);
                     break;
                 case QUERY:
                     if (paramValue != null) {
@@ -102,9 +106,6 @@ public class RestfulService implements Service {
                 default:
             }
         }
-        System.out.println("!!!!!!!!!");
-        System.out.println(uriVariableMap);
-        System.out.println(builder.build());
         URI uri = builder
                 .build()
 //                .expand(uriVariableMap)
@@ -171,6 +172,15 @@ public class RestfulService implements Service {
 
     public void setOperation(Operation operation) {
         this.operation = operation;
+    }
+
+    @Override
+    public int getResponseTime() {
+        return responseTime;
+    }
+
+    public void setResponseTime(int responseTime) {
+        this.responseTime = responseTime;
     }
 
     public Set<Parameter> getUniqueRequestParams() {
