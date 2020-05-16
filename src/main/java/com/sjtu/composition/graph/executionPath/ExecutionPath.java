@@ -1,288 +1,311 @@
 package com.sjtu.composition.graph.executionPath;
 
 import com.alibaba.fastjson.JSONObject;
-import com.sjtu.composition.graph.CompositionSolution;
 import com.sjtu.composition.graph.serviceGraph.ParamNode;
 import com.sjtu.composition.graph.serviceGraph.ServiceNode;
 import com.sjtu.composition.serviceUtils.Parameter;
-import com.sjtu.composition.serviceUtils.Service;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+
 
 public class ExecutionPath implements Cloneable {
-    //可以类公用的虚拟头尾节点
-    public static final ExecutionNode START_NODE = new ExecutionNode(ExecutionNode.Type.START, null);
-    public static final ExecutionNode END_NODE = new ExecutionNode(ExecutionNode.Type.END, null);
-    // 用来表示某一条具体路径的边信息
-    private Map<ExecutionPathNode, Set<ExecutionPathNode>> pathMap = new HashMap<>();//连接边
-    private Map<ExecutionNode, Set<MatchNode>> preMatchNodes = new HashMap<>();//每个运行节点需要的前置matchNode
-    // 提取过程中的辅助数据结构
-    private volatile Map<ExecutionNode, Set<ParamNode>> unresolvedExecutionHeads = new HashMap<>();//<需要匹配的头节点，其需要匹配的输入>
-    private volatile Map<ExecutionNode, Integer> unresolvedHeadLength = new HashMap<>();//待匹配节点之后的路径长度
-    // TODO: 保存path参数，用于path间的比较选择（需要clone）
-    // 例如：服务数量、组合长度、涉及到的服务的集合、QoS……
-    private Set<ServiceNode> involvedServiceNodes = new HashSet<>();
-    // 执行时保存的信息（提取后执行，不涉及clone）
-    private Map<MatchNode, Object> matchArgs;// 记录对应每个 matchNode 的实际数据对象
-    private Set<ExecutionPathNode> nextExecutions;// 记录接下来可能执行的 execution
+
+    // 路径图表示，需要实现 clone
+    private ServiceNode sourceNode;
+    private ServiceNode sinkNode;
+    private Set<ServiceNode> serviceNodeSet = new HashSet<>();
+    private Map<ParamNode, Map<ParamNode, Double>> matchEdgeMap = new HashMap<>();// 选取的匹配边
+    private Map<ParamNode, Integer> responseTimeBound = new HashMap<>();
+    // 构造过程中的辅助结构，需要 clone
+    private Map<ParamNode, Set<ServiceNode>> unresolvedInput = new HashMap<>();//当前为解决的输入=该输入后续可达服务（用以检查环）
+    // 编排辅助结构：服务依赖关系，需要clone
+    private Map<ServiceNode, Integer> dependencyCountMap = new HashMap<>();
+
+    // 路径图参数，super.clone()
+    private double similarityFloor = 1.0;
+    private boolean allResolved = false;
+
+    // 服务编排，不需要 clone
+    private Map<ServiceNode, CompletableFuture> serviceNodeCompletableFutureMap = new HashMap<>();
+    private Map<Parameter, Object> parameterObjectMap;
 
 
-    public ExecutionPath(CompositionSolution solution) {
-        Set<ParamNode> toMatchSet = new HashSet<>(solution.getTargetOutput());
-        unresolvedExecutionHeads.put(END_NODE, toMatchSet);
-        unresolvedHeadLength.put(END_NODE, 0);
-    }
-
-    public enum ConnectType {
-        EXECUTION_TO_MATCH, MATCH_TO_EXECUTION,
-    }
-
-    // 连接路径
-    public void connect(ExecutionPathNode former, ExecutionPathNode latter, ConnectType type) {
-        pathMap.computeIfAbsent(former, k -> new HashSet<>()).add(latter);
-        if (type == ConnectType.MATCH_TO_EXECUTION
-                && former.getClass() == MatchNode.class
-                && latter.getClass() == ExecutionNode.class) {
-            preMatchNodes.computeIfAbsent((ExecutionNode) latter, k -> new HashSet<>())
-                    .add((MatchNode) former);
+    public ExecutionPath(ServiceNode sourceNode, ServiceNode sinkNode) {
+        this.sourceNode = sourceNode;
+        this.serviceNodeSet.add(sourceNode);
+        this.sinkNode = sinkNode;
+        this.serviceNodeSet.add(sinkNode);
+        for (ParamNode input : this.sinkNode.getInputs()) {
+            Set<ServiceNode> followingServiceNodes = new HashSet<>();
+            followingServiceNodes.add(this.sinkNode);
+            this.unresolvedInput.put(input, followingServiceNodes);
+            this.responseTimeBound.put(input, this.sinkNode.getResponseTimeFloor());
         }
-        if (type == ConnectType.EXECUTION_TO_MATCH
-                && former.getClass() == ExecutionNode.class
-                && latter.getClass() == MatchNode.class) {
-            ServiceNode serviceNode = ((ExecutionNode) former).getServiceNode();
-            if (former != START_NODE && serviceNode != null) {
-                involvedServiceNodes.add(serviceNode);
+    }
+
+    /**
+     * Resolve 解决输入匹配问题
+     * 每次调用解决一个输入，并更新图的相关参数/判断是否满足条件（DAG，最优QoS……）
+     */
+    public boolean resolve(ParamNode matchSource, ParamNode matchTarget, double similarity) {
+        //更新unresolved
+        if (this.serviceNodeSet.contains(matchSource.getServiceNode())) {// 包含的 service node 不需要更新
+            ServiceNode preServiceNode = matchSource.getServiceNode();
+            // 更新QoS Bound
+            if (!this.updateResponseTimeBound(preServiceNode, this.responseTimeBound.get(matchTarget))) {
+                return false;
+            }
+            // 传递后续set
+            Set<ServiceNode> reachable = this.unresolvedInput.get(matchTarget);
+            this.unresolvedInput.remove(matchTarget);//旧unresolved
+            for (ParamNode unresolved : this.unresolvedInput.keySet()) {
+                if (this.unresolvedInput.get(unresolved).contains(preServiceNode)) {
+                    this.unresolvedInput.get(unresolved).addAll(reachable);
+                }
+            }
+        } else {
+            ServiceNode preServiceNode = matchSource.getServiceNode();
+            if (preServiceNode.getResponseTimeFloor() > this.responseTimeBound.get(matchTarget)) {
+                return false;
+            }
+            this.serviceNodeSet.add(preServiceNode);//更新包含的 service node
+            Set<ServiceNode> reachable = this.unresolvedInput.get(matchTarget);
+            reachable.add(preServiceNode);
+            this.unresolvedInput.remove(matchTarget);//旧unresolved
+            for (ParamNode unresolvedNew : preServiceNode.getInputs()) {
+                this.unresolvedInput.put(unresolvedNew, new HashSet<>(reachable));//新unresolved + 后续set
+                this.responseTimeBound.put(
+                        unresolvedNew,
+                        this.responseTimeBound.get(matchTarget) - preServiceNode.getService().getResponseTime()
+                );//QoS Bound
             }
         }
-    }
-
-    // 对路径的重复部分进行合并
-    public void merge() {
-        this.mergeMatchNode(START_NODE);
-    }
-
-    private boolean canMerge(ExecutionPathNode node1, ExecutionPathNode node2) {
-        if (node1.getClass() != node2.getClass()) return false;
-        if (node1.getClass() == MatchNode.class) {
-            return ((MatchNode) node1).mayMergeWith((MatchNode) node2);
+        // 添加匹配边，更新匹配相似度下限
+        this.matchEdgeMap.computeIfAbsent(matchSource, v -> new HashMap<>()).put(matchTarget, similarity);
+        this.matchEdgeMap.computeIfAbsent(matchTarget, v -> new HashMap<>()).put(matchSource, similarity);
+        ServiceNode matchTargetServiceNode = matchTarget.getServiceNode();
+        this.dependencyCountMap.put(matchTargetServiceNode,
+                1 + this.dependencyCountMap.getOrDefault(matchTargetServiceNode, 0));
+        if (similarity < this.similarityFloor) {
+            this.similarityFloor = similarity;
         }
-        if (node1.getClass() == ExecutionNode.class) {
-            ExecutionNode n1 = (ExecutionNode) node1;
-            ExecutionNode n2 = (ExecutionNode) node2;
-            Set<MatchNode> preMatch1 = preMatchNodes.get(n1);
-            Set<MatchNode> preMatch2 = preMatchNodes.get(n2);
-            return n1.mayMergeWith(n2) &&
-                    preMatch1.containsAll(preMatch2) && preMatch2.containsAll(preMatch1);
-        }
-        return false;
+        return true;
     }
 
-    // 合并某一个 ExecutionNode 的后续 matchNode
-    private void mergeMatchNode(ExecutionNode executionNode) {
-        Set<ExecutionPathNode> matchNodes = pathMap.get(executionNode);//后续的匹配节点
-        Object[] matchNodeList = matchNodes.toArray();
-        // 两两比较并避免重复
-        for (int i = 0; i < matchNodeList.length - 1; i++) {
-            for (int j = i + 1; j < matchNodeList.length; j++) {
-                MatchNode matchNode1 = (MatchNode) matchNodeList[i];
-                MatchNode matchNode2 = (MatchNode) matchNodeList[j];
-                if (this.canMerge(matchNode1, matchNode2)) {
-                    //前节点连接边合并
-                    pathMap.get(executionNode).remove(matchNode2);
-                    //后连接边（matchNode <- executionNode）
-                    for (ExecutionPathNode node : pathMap.get(matchNode2)) {
-                        ExecutionNode latterExecutionNode = (ExecutionNode) node;
-                        preMatchNodes.get(latterExecutionNode).remove(matchNode2);
-                        preMatchNodes.get(latterExecutionNode).add(matchNode1);
+    // resolve过程中，反向遍历，递归更新 QoS Bound
+    private boolean updateResponseTimeBound(ServiceNode serviceNode, int outputResponseTimeBound) {
+        if (serviceNode == this.sourceNode) {
+            return outputResponseTimeBound >= 0;
+        }
+        int responseTimeBoundNew = outputResponseTimeBound - serviceNode.getService().getResponseTime();
+        if (serviceNode.getResponseTimeFloor() > responseTimeBoundNew) {
+            return false;
+        }
+        boolean result = true;
+        for (ParamNode input : serviceNode.getInputs()) {
+            int responseTimeBound = this.responseTimeBound.get(input);
+            if (responseTimeBoundNew < responseTimeBound) {
+                this.responseTimeBound.put(input, responseTimeBoundNew);
+                for (ParamNode matchSource : this.matchEdgeMap.get(input).keySet()) {//应该只有一个
+                    result &= this.updateResponseTimeBound(matchSource.getServiceNode(), responseTimeBoundNew);
+                    if (!result) {
+                        break;
                     }
-                    //后连接边（matchNode -> executionNode）
-                    pathMap.get(matchNode1).addAll(pathMap.get(matchNode2));
-                    //合并后续的execution节点
-                    this.mergeExecutionNode(matchNode1);
-                    //移除被合并的节点
-                    pathMap.remove(matchNode2);
-                    //修改list中被合并的节点(后者)位置，避免重复
-                    matchNodeList[j] = matchNode1;
                 }
             }
         }
-    }
-
-    // 合并某一个 MatchNode 的后续 executionNode
-    private void mergeExecutionNode(MatchNode matchNode) {
-        Set<ExecutionPathNode> executionPathNodes = pathMap.get(matchNode);//后续の执行节点
-        Object[] executionNodeList = executionPathNodes.toArray();
-        // 两两比较并避免重复
-        for (int i = 0; i < executionNodeList.length - 1; i++) {
-            for (int j = i + 1; j < executionNodeList.length; j++) {
-                ExecutionNode executionNode1 = (ExecutionNode) executionNodeList[i];
-                ExecutionNode executionNode2 = (ExecutionNode) executionNodeList[j];
-                if (this.canMerge(executionNode1, executionNode2)) {
-                    // 前节点连接边合并( matchNode -> executionNode )
-                    for (MatchNode preMatch : preMatchNodes.get(executionNode1)) {
-                        pathMap.get(preMatch).remove(executionNode2);
-                    }
-                    // 前连接边（matchNode <- executionNode）
-                    preMatchNodes.remove(executionNode2);
-                    // 后连接边（executionNode -> matchNode）
-                    pathMap.get(executionNode1).addAll(pathMap.get(executionNode2));
-                    //合并后续的match节点
-                    this.mergeMatchNode(executionNode1);
-                    //移除被合并的节点
-                    pathMap.remove(executionNode2);
-                    //修改list中被合并的节点(后者)位置，避免重复
-                    executionNodeList[j] = executionNode1;
-                }
-            }
-        }
+        return result;
     }
 
     // TODO: 验证该路径的可行性（各服务是否可用、结构化兼容情况）
     public boolean isAvailable() {
-        boolean isAvailable = true;
-        for (ServiceNode serviceNode : involvedServiceNodes) {
-            if (!serviceNode.getService().isAvailable()) {
-                isAvailable = false;
-                break;
-            }
-        }
-        return isAvailable;
+        return true;
     }
 
-    // TODO: 执行，返回执行结果
-    public JSONObject run(JSONObject args) {
-        System.out.println(this);
-        System.out.println("**** Run ****");
-        System.out.println("Args:" + args);
-        matchArgs = new HashMap<>();
-        nextExecutions = new HashSet<>();
-        // 初始输入 args 作为 START_NODE 的输出
-        // 把实际参数和 matchNode 对应起来
-        this.saveOutputMatch(args, START_NODE);
-        return this.recursiveExecute();
-    }
+    /**
+     * Run 运行
+     * 通过 CompletableFuture 进行多线程异步调用编排（Orchestration）
+     * 类拓扑排序，减少创建线程时因等待带来的延迟
+     */
+    public JSONObject run(JSONObject args) throws AutoExecuteException, ExecutionException, InterruptedException {
+        System.out.println(args);
+        // 编排和参数准备
+        Set<ServiceNode> orchestrateSet = new HashSet<>();
+        this.parameterObjectMap = new ConcurrentHashMap<>();
 
-    private void saveOutputMatch(JSONObject args, ExecutionNode executed) {
-        Set<ExecutionPathNode> matchNodes = pathMap.get(executed);
-        for (ExecutionPathNode node : matchNodes) {
-            MatchNode matchNode = (MatchNode) node;
-            ParamNode sourceParamNode = matchNode.getMatchSourceNode();
-            // 保存对应关系和实际参数
-            matchArgs.put(matchNode, args.get(sourceParamNode.getParam().getName()));
-            // 后续的 execution 放入 nextExecutions 中
-            nextExecutions.addAll(pathMap.get(node));
-        }
-    }
-
-    private JSONObject recursiveExecute() {
-        for (ExecutionPathNode pathNode : nextExecutions) {
-            ExecutionNode executionNode = (ExecutionNode) pathNode;
-            Set<MatchNode> requiredInputMatches = preMatchNodes.get(executionNode);
-            // 如果 execution 需要的 matchNode 都已经有了对应数据，则可以执行
-            if (matchArgs.keySet().containsAll(requiredInputMatches)) {
-                // 如果 end 满足条件，即结束执行
-                if (executionNode == END_NODE) {
-                    Set<MatchNode> actualOutputMatches = preMatchNodes.get(END_NODE);
-                    JSONObject actualOutput = new JSONObject();
-                    for (MatchNode matchNode : actualOutputMatches) {
-                        actualOutput.put(matchNode.getMatchTargetNode().getParam().getName(), matchArgs.get(matchNode));
+        // 处理初始输入
+        JSONObject queryArgs = args.getJSONObject("query");
+        for (ParamNode matchSource : this.sourceNode.getOutputs()) {
+            switch (matchSource.getParam().getParamCategory()) {
+                case QUERY:
+                    Object value = queryArgs.get(matchSource.getParam().getName());
+                    if (value != null) {
+                        for (ParamNode matchTarget : this.matchEdgeMap.get(matchSource).keySet()) {
+                            this.parameterObjectMap.putIfAbsent(matchTarget.getParam(), value);
+                            int dependencyCount = this.dependencyCountMap.get(matchTarget.getServiceNode());
+                            dependencyCount--;
+                            if (dependencyCount == 0) {
+                                orchestrateSet.add(matchTarget.getServiceNode());
+                            }
+                            this.dependencyCountMap.put(matchTarget.getServiceNode(), dependencyCount);
+                        }
+                    } else {
+                        throw new AutoExecuteException("missing input param");
                     }
-                    return actualOutput;
-                }
-                // 本次执行的服务及其节点
-                ServiceNode serviceNode = executionNode.getServiceNode();
-                Service service = serviceNode.getService();
-                // 1. 处理输入
-                // 对于每个 matchNode，找到其对应调用参数
-                Map<Parameter, Object> input = new HashMap<>();//实际调用参数
-                for (MatchNode matchNode : requiredInputMatches) {
-                    ParamNode requiredArgNode = matchNode.getMatchTargetNode();
-                    input.put(requiredArgNode.getParam(), matchArgs.get(matchNode));
-                }
-                // 2. 执行，移出 nextExecutions
-                // inputs构造完毕，调用服务，得到输出
-                JSONObject output = service.run(input);
-                nextExecutions.remove(pathNode);
-                // 3. 处理输出
-                // 输出存入 matchArgs，并找出后续 execution
-                this.saveOutputMatch(output, executionNode);
-                break;
+                    break;
+                case PATH:
+                case BODY:
+                default:
+                    throw new AutoExecuteException("only support query param");
             }
         }
-        return this.recursiveExecute();
+        //输入参数构造完毕，编排执行服务
+        //借鉴拓扑排序思想，降低节点入度至 0 时加入队列构造 allOf
+        Orchestration:
+        while (!orchestrateSet.isEmpty()) {
+            Set<ServiceNode> orchestrateSetNew = new HashSet<>();
+            for (ServiceNode node : orchestrateSet) {
+                // sinkNode 在 break 后统一处理
+                if (node == this.sinkNode) {
+                    break Orchestration;
+                }
+                // 一般服务节点，用 allOf 编排
+                List<CompletableFuture> dependFutureList = new ArrayList<>();
+                for (ParamNode input : node.getInputs()) {
+                    ServiceNode dependNode = this.matchEdgeMap.get(input).keySet().iterator().next().getServiceNode();
+                    if (dependNode != this.sourceNode) {
+                        dependFutureList.add(this.serviceNodeCompletableFutureMap.get(dependNode));
+                    }
+                }
+                CompletableFuture<Void> future;
+                if (dependFutureList.isEmpty()) {
+                    future = CompletableFuture.runAsync(new ServiceThread(node));
+                } else {
+                    future = CompletableFuture
+                            .allOf(dependFutureList.toArray(new CompletableFuture[0]))
+                            .thenRunAsync(new ServiceThread(node));
+                }
+                this.serviceNodeCompletableFutureMap.put(node, future);
+                // 后续节点降低入度，加入New等待下一轮编排
+                for (ParamNode output : node.getOutputs()) {
+                    if (this.matchEdgeMap.get(output) == null) {
+                        continue;
+                    }
+                    for (ParamNode matchTarget : this.matchEdgeMap.get(output).keySet()) {
+                        ServiceNode follow = matchTarget.getServiceNode();
+                        int dependencyCount = this.dependencyCountMap.get(follow);
+                        if (--dependencyCount == 0) {
+                            orchestrateSetNew.add(follow);
+                        }
+                        this.dependencyCountMap.put(follow, dependencyCount);
+                    }
+                }
+            }
+            // 换成下一轮编排对象
+            orchestrateSet = orchestrateSetNew;
+        }
+
+        // sinkNode 编排
+        List<CompletableFuture> dependFutureList = new ArrayList<>();
+        for (ParamNode input : this.sinkNode.getInputs()) {
+            ServiceNode dependNode = this.matchEdgeMap.get(input).keySet().iterator().next().getServiceNode();
+            if (dependNode != this.sourceNode) {
+                dependFutureList.add(this.serviceNodeCompletableFutureMap.get(dependNode));
+            }
+        }
+        CompletableFuture<Void> sinkFuture = CompletableFuture
+                .allOf(dependFutureList.toArray(new CompletableFuture[0]));
+
+        // 等待 sinkNode，结束后返回最终结果
+        sinkFuture.get();
+        JSONObject result = new JSONObject();
+        for (ParamNode paramNode : this.sinkNode.getInputs()) {
+            Object value = this.parameterObjectMap.get(paramNode.getParam());
+            result.put(paramNode.getParam().getName(), value);
+        }
+
+        return result;
     }
 
-    public Map<ExecutionNode, Set<ParamNode>> getUnresolvedExecutionHeads() {
-        return unresolvedExecutionHeads;
+    // 单个服务调用线程
+    private class ServiceThread extends Thread {
+        private ServiceNode executeNode;
+
+        private ServiceThread(ServiceNode executeNode) {
+            this.executeNode = executeNode;
+        }
+
+        @Override
+        public void run() {
+            JSONObject output = this.executeNode.getService().run(parameterObjectMap);
+            for (ParamNode matchSource : this.executeNode.getOutputs()) {
+                if (!matchEdgeMap.containsKey(matchSource)) {
+                    continue;
+                }
+                Object value = output.get(matchSource.getParam().getName());
+                if (value != null) {
+                    for (ParamNode matchTarget : matchEdgeMap.get(matchSource).keySet()) {
+                        parameterObjectMap.putIfAbsent(matchTarget.getParam(), value);
+                    }
+                } else {
+                    throw new AutoExecuteException("auto execute failure: " +
+                            "missing output param {" + matchSource.getParam().getName() + "}");
+                }
+            }
+        }
     }
 
-    public Map<ExecutionNode, Integer> getUnresolvedHeadLengthMap() {
-        return unresolvedHeadLength;
+
+    /**
+     * getter & setter
+     */
+    public Map<ParamNode, Set<ServiceNode>> getUnresolvedInput() {
+        return unresolvedInput;
     }
+
+    public double getSimilarityFloor() {
+        return similarityFloor;
+    }
+
+    public boolean isAllResolved() {
+        return allResolved;
+    }
+
+    public void setAllResolved(boolean allResolved) {
+        this.allResolved = allResolved;
+    }
+
 
     @Override
     public Object clone() throws CloneNotSupportedException {
         ExecutionPath clone = (ExecutionPath) super.clone();
-        // 复制匹配连接边
-        clone.pathMap = new HashMap<>();
-        for (Map.Entry<ExecutionPathNode, Set<ExecutionPathNode>> entry : this.pathMap.entrySet()) {
-            ExecutionPathNode key = entry.getKey();
-            Set<ExecutionPathNode> value = entry.getValue();
-            Set<ExecutionPathNode> cloneValue = new HashSet<>(value);
-            clone.pathMap.put(key, cloneValue);
+
+        clone.serviceNodeSet = new HashSet<>(this.serviceNodeSet);
+        clone.matchEdgeMap = new HashMap<>();
+        for (ParamNode node : this.matchEdgeMap.keySet()) {
+            clone.matchEdgeMap.put(node, new HashMap<>(this.matchEdgeMap.get(node)));
         }
-        // 复制前置匹配节点
-        clone.preMatchNodes = new HashMap<>();
-        for (Map.Entry<ExecutionNode, Set<MatchNode>> entry : this.preMatchNodes.entrySet()) {
-            ExecutionNode key = entry.getKey();
-            Set<MatchNode> value = entry.getValue();
-            Set<MatchNode> cloneValue = new HashSet<>(value);
-            clone.preMatchNodes.put(key, cloneValue);
+        clone.responseTimeBound = new HashMap<>(this.responseTimeBound);
+
+        clone.unresolvedInput = new HashMap<>();
+        for (ParamNode node : this.unresolvedInput.keySet()) {
+            clone.unresolvedInput.put(node, new HashSet<>(this.unresolvedInput.get(node)));
         }
-        // 复制尚未匹配的节点map
-        clone.unresolvedExecutionHeads = new HashMap<>();
-        for (Map.Entry<ExecutionNode, Set<ParamNode>> entry : this.unresolvedExecutionHeads.entrySet()) {
-            ExecutionNode key = entry.getKey();
-            Set<ParamNode> value = entry.getValue();
-            Set<ParamNode> cloneValue = new HashSet<>(value);
-            clone.unresolvedExecutionHeads.put(key, cloneValue);
-        }
-        // 复制待匹配节点之后的路径长度
-        clone.unresolvedHeadLength = new HashMap<>();
-        for (Map.Entry<ExecutionNode, Integer> entry : this.unresolvedHeadLength.entrySet()) {
-            ExecutionNode key = entry.getKey();
-            Integer value = entry.getValue();
-            clone.unresolvedHeadLength.put(key, value);
-        }
-        // 复制涉及的服务（节点）
-        clone.involvedServiceNodes = new HashSet<>(this.involvedServiceNodes);
+
+        clone.dependencyCountMap = new HashMap<>(this.dependencyCountMap);
+
         return clone;
     }
 
     @Override
     public String toString() {
-        StringBuilder builder = new StringBuilder();
-        builder.append("=======\nExecution Path {\n");
-        builder.append("involved:\n\t").append(involvedServiceNodes).append("\n");
-        builder.append("path:\n");
-        generatePrintString(builder, START_NODE, 1);
-        builder.append("\n}");
-        return builder.toString();
+        Set<ServiceNode> nodeSet = new HashSet<>(serviceNodeSet);
+        nodeSet.remove(this.sourceNode);
+        nodeSet.remove(this.sinkNode);
+        return "ExecutionPath{" + nodeSet + "}";
     }
 
-    //toString Helper
-    private void generatePrintString(StringBuilder builder, ExecutionPathNode head, int tabCount) {
-        for (int i = 0; i < tabCount; i++) {
-            builder.append("\t");
-        }
-        builder.append(head);
-        if (head == END_NODE) return;
-        builder.append(pathMap.get(head));
-        for (ExecutionPathNode matchNode : pathMap.get(head)) {
-            for (ExecutionPathNode nextExecutionNode : pathMap.get(matchNode)) {
-                builder.append("\n");
-                generatePrintString(builder, nextExecutionNode, tabCount + 1);
-            }
-        }
-    }
 }

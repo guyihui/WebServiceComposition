@@ -17,7 +17,6 @@ public class ServiceGraph {
     protected ServiceNode sourceNode = new ServiceNode(null);
     protected ServiceNode sinkNode = new ServiceNode(null);
 
-
     // 构造约束
     protected boolean isBuilt = false;
     protected double similarityLimit = 1.0;
@@ -60,7 +59,6 @@ public class ServiceGraph {
             dropUnreachableServices();
             cleanInvalidMatchEdge();
             calculateQoSFloor();
-            //TODO: prune with QoS
         }
         return this.isBuilt;
     }

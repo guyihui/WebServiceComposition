@@ -101,7 +101,7 @@ public class ServiceRepository {
         requestParams.add(new Parameter<String>("location", Parameter.ParamCategory.QUERY, "定位", true, Parameter.ParamType.STRING));
         Set<Parameter> responseParams = new HashSet<>();
         responseParams.add(new Parameter<String>("longitude", Parameter.ParamCategory.RESPONSE, "经度", true, Parameter.ParamType.STRING));
-        return new RestfulService("获取经度", "得到某地的经度", 100,
+        return new RestfulService("获取经度", "得到某地的经度", 50,
                 "http://localhost:8080/longitude", Service.Operation.GET, requestParams, responseParams
         );
     }

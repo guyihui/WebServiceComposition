@@ -39,40 +39,68 @@ public class SubstitutionController {
     }
 
     @PostMapping(value = "/substitution/{serviceId}", produces = "application/json;charset=UTF-8")
-    public JSONObject substitute(@PathVariable("serviceId") int serviceId, @RequestBody JSONObject inputArgs) {
+    public JSONObject substitute(@PathVariable("serviceId") int serviceId,
+                                 @RequestParam(value = "k", required = false, defaultValue = "1") int topK,
+                                 @RequestParam(value = "execute", required = false, defaultValue = "false") boolean toExecute,
+                                 @RequestParam("similarity") Double similarityLimit,
+                                 @RequestParam("layer") Integer layerLimit,
+                                 @RequestBody JSONObject inputArgs) {
+        JSONObject result = new JSONObject();
+        result.put("isResolved", false);
+        result.put("message", "");
+        result.put("recommend", new ArrayList<>());
+
         Service targetService = serviceRepository.getServiceById(serviceId);
         if (targetService == null) {
-            return null;//TODO:构造对应的返回json
+            result.put("message", "no such service");
+            return result;
         }
+        Set<Service> serviceCluster = serviceRepository.getServiceClusterById(serviceId);
 
         CompositionSolution solution = new CompositionSolution(
-                targetService,
-                serviceRepository.getServiceClusterById(serviceId),
-                similarityUtils
+                targetService, //目标服务
+                serviceCluster, //聚类范围
+                similarityUtils //相似度工具类
         );
-        JSONObject result = new JSONObject();
 
-        if (solution.build(0.9, 5)) { // 可尝试执行
+        if (solution.build(similarityLimit, layerLimit)) { // 可尝试执行
+
             System.out.println(solution);
-            Set<ExecutionPath> paths = solution.extractExecutionPaths(3);
+            List<ExecutionPath> paths = null;
+            try {
+                paths = solution.extractExecutionPaths(topK);
+            } catch (CloneNotSupportedException e) {
+                e.printStackTrace();
+            }
+            result.put("recommend", paths);
+            if (paths == null) {
+                return result;
+            }
             System.out.println("Path count = " + paths.size());
 
-            for (ExecutionPath path : paths) {
-                System.out.println();
-                if (path.isAvailable()) {
-                    result.put("isResolved", true);
-                    result.put("result", path.run(inputArgs));//TODO:选择
-                    System.out.println(result);
-                    return result;
-                } else {
-                    //TODO:无法自动执行
+            if (toExecute) {
+                List<JSONObject> executions = new ArrayList<>();//TODO:应该只有一个JSONObject（非list）
+                for (ExecutionPath path : paths) {
+                    System.out.println(path);
+                    if (path.isAvailable()) {
+                        result.put("isResolved", true);
+                        JSONObject executionResult = null;
+                        try {
+                            executionResult = path.run(inputArgs);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                        System.out.println(executionResult);
+                        executions.add(executionResult);
+                    } else {
+                        executions.add(null);
+                    }
                 }
+                result.put("result", executions);
             }
-        } else { //失败，推荐/其他情况
-//            System.out.println("\n______ test run serviceX ______");
-//            System.out.println(targetService.run(inputArgs));
-            result.put("isResolved", false);
-            result.put("recommend", null);
+            result.put("message", "ok");
+        } else { //图构建失败
+            result.put("message", "build failed");
         }
         return result;
 
