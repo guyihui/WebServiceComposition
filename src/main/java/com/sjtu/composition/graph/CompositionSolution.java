@@ -24,7 +24,7 @@ public class CompositionSolution extends ServiceGraph {
     // 方案结果属性
     private boolean isResolved = false;//TODO:对应原因
 
-    public boolean build(double similarityLimit, int layerLimit) {
+    public boolean build(double similarityLimit, int layerLimit) throws Exception {
         this.isResolved = super.build(similarityLimit, layerLimit);
         return isResolved;
     }

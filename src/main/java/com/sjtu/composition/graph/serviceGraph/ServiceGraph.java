@@ -51,7 +51,7 @@ public class ServiceGraph {
         this.sinkNode.setInputs(targetOutputs);
     }
 
-    protected boolean build(double similarityLimit, int layerLimit) {
+    protected boolean build(double similarityLimit, int layerLimit) throws Exception {
         clear();
         prepare(similarityLimit, layerLimit);
         this.isBuilt = expand();
@@ -132,7 +132,7 @@ public class ServiceGraph {
      * @return true表示目标服务的全部（或指定）输出可以被匹配替换
      * TODO: 无输入/输出的服务
      */
-    private boolean expand() {
+    private boolean expand() throws Exception {
 
         Set<ParamNode> validParamNodeSet = new HashSet<>(this.sourceNode.getOutputs());
         Map<Integer, ServiceNode> validServiceNodeMap = new HashMap<>();
@@ -198,7 +198,7 @@ public class ServiceGraph {
     }
 
     // 正向单次扩展：根据语义相似度，获取可以匹配的节点，保存匹配边 G( ,E)
-    private Set<ParamNode> matchBySimilarity(Set<ParamNode> source) {
+    private Set<ParamNode> matchBySimilarity(Set<ParamNode> source) throws Exception {
         Set<ParamNode> expandSet = new HashSet<>();
         for (ParamNode node : source) {
             for (ParamNode target : this.matchTarget) {
@@ -214,7 +214,7 @@ public class ServiceGraph {
     }
 
     // 计算两个节点间的相似度
-    private double getSimilarity(ParamNode node1, ParamNode node2) {
+    private double getSimilarity(ParamNode node1, ParamNode node2) throws Exception {
         return similarityUtils.similarity(node1.getParam(), node2.getParam());
     }
 

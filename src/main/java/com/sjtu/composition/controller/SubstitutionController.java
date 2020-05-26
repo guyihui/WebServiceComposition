@@ -63,7 +63,15 @@ public class SubstitutionController {
                 similarityUtils //相似度工具类
         );
 
-        if (solution.build(similarityLimit, layerLimit)) { // 可尝试执行
+        boolean isBuilt;
+        try {
+            isBuilt = solution.build(similarityLimit, layerLimit);
+        } catch (Exception e) {
+            e.printStackTrace();
+            result.put("message", e.toString());
+            return result;
+        }
+        if (isBuilt) { // 可尝试执行
 
             System.out.println(solution);
             List<ExecutionPath> paths = null;
@@ -71,6 +79,8 @@ public class SubstitutionController {
                 paths = solution.extractExecutionPaths(topK);
             } catch (CloneNotSupportedException e) {
                 e.printStackTrace();
+                result.put("message", e.toString());
+                return result;
             }
             result.put("recommend", paths);
             if (paths == null) {
