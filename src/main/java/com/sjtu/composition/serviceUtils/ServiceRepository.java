@@ -21,6 +21,10 @@ public class ServiceRepository {
         return 0 <= id && id < serviceList.size() ? serviceList.get(id) : null;
     }
 
+    public boolean serviceIsAvailable(int id){
+        return true;//TODO
+    }
+
     public synchronized Set<Service> getServiceClusterById(int id) {
         // TODO: 服务聚类
         return new HashSet<>(serviceList);
@@ -101,7 +105,7 @@ public class ServiceRepository {
         requestParams.add(new Parameter<String>("location", Parameter.ParamCategory.QUERY, "定位", true, Parameter.ParamType.STRING));
         Set<Parameter> responseParams = new HashSet<>();
         responseParams.add(new Parameter<String>("longitude", Parameter.ParamCategory.RESPONSE, "经度", true, Parameter.ParamType.STRING));
-        return new RestfulService("获取经度", "得到某地的经度", 50,
+        return new RestfulService("获取经度", "得到某地的经度", 80,
                 "http://localhost:8080/longitude", Service.Operation.GET, requestParams, responseParams
         );
     }

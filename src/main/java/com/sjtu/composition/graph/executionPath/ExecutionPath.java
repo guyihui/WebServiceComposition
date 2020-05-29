@@ -240,18 +240,18 @@ public class ExecutionPath implements Cloneable {
 
         @Override
         public void run() {
-            JSONObject output = this.executeNode.getService().run(parameterObjectMap);
+            this.executeNode.getService().run(parameterObjectMap);
             for (ParamNode matchSource : this.executeNode.getOutputs()) {
                 if (!matchEdgeMap.containsKey(matchSource)) {
                     continue;
                 }
-                Object value = output.get(matchSource.getParam().getName());
-                if (value != null) {
+                if (parameterObjectMap.containsKey(matchSource.getParam())) {
+                    Object value = parameterObjectMap.get(matchSource.getParam());
                     for (ParamNode matchTarget : matchEdgeMap.get(matchSource).keySet()) {
                         parameterObjectMap.putIfAbsent(matchTarget.getParam(), value);
                     }
                 } else {
-                    throw new AutoExecuteException("auto execute failure: " +
+                    throw new AutoExecuteException("Matching failure: " +
                             "missing output param {" + matchSource.getParam().getName() + "}");
                 }
             }

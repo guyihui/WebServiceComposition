@@ -24,7 +24,6 @@ public class Parameter<T> {
 
     private String info;        //  补充描述 | e.g. "行政区划区域检索不支持多关键字检索。..."
     private T defaultValue;
-//    private List<JSONObject> examples;// 举例
     //TODO:与其他参数的依赖关系
 
     public Parameter(String name, ParamCategory paramCategory, String description, boolean isRequired, ParamType paramType) {

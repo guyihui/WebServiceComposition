@@ -1,56 +1,110 @@
 package com.sjtu.composition.serviceUtils;
 
 import com.alibaba.fastjson.JSONObject;
+import com.sjtu.composition.graph.executionPath.AutoExecuteException;
 
 import java.util.Map;
 import java.util.Set;
 
-public interface Service {
+public abstract class Service {
     enum Operation {
         GET, POST, PUT, DELETE
     }
 
-    //TODO: 检查服务是否可用
-    default boolean isAvailable() {
-        return true;
-    }
+    // 服务描述信息：id、服务名、功能描述...
+    protected int id = -1;//e.g.0?
+    protected String name;//e.g.行政区划区域检索
+    protected String description;
 
-    int getResponseTime();
+    // 服务访问：url，操作类型...
+    protected String endpoint;//e.g. http://api.map.baidu.com/place/v2/search
+    protected Operation operation;//e.g. GET
 
-    JSONObject run(Map<Parameter, Object> input);
+    // 独有属性，不参与匹配，例如 开发key
+    protected Set<Parameter> uniqueRequestParams;
+
+    // 输入/输出
+    protected Set<Parameter> requestParams;// path | query | body
+    protected Set<Parameter> responseParams;
+    //TODO: 保存参数的嵌套结构(type:object)
+
+    protected int responseTime;// TODO: 其他QoS度量（吞吐量等）
+
+
+    //
+    public abstract boolean run(Map<Parameter, Object> input);
+
 
     //getter & setter
-    int getId();
+    public int getId() {
+        return id;
+    }
 
-    void setId(int id);
+    public void setId(int id) {
+        this.id = id;
+    }
 
-    String getName();
+    public String getName() {
+        return name;
+    }
 
-    void setName(String name);
+    public void setName(String name) {
+        this.name = name;
+    }
 
-    String getDescription();
+    public String getDescription() {
+        return description;
+    }
 
-    void setDescription(String description);
+    public void setDescription(String description) {
+        this.description = description;
+    }
 
-    String getEndpoint();
+    public String getEndpoint() {
+        return endpoint;
+    }
 
-    void setEndpoint(String endpoint);
+    public void setEndpoint(String endpoint) {
+        this.endpoint = endpoint;
+    }
 
-    Operation getOperation();
+    public Operation getOperation() {
+        return operation;
+    }
 
-    void setOperation(Operation operation);
+    public void setOperation(Operation operation) {
+        this.operation = operation;
+    }
 
-    Set<Parameter> getUniqueRequestParams();
+    public Set<Parameter> getUniqueRequestParams() {
+        return uniqueRequestParams;
+    }
 
-    void setUniqueRequestParams(Set<Parameter> uniqueRequestParams);
+    public void setUniqueRequestParams(Set<Parameter> uniqueRequestParams) {
+        this.uniqueRequestParams = uniqueRequestParams;
+    }
 
-    Set<Parameter> getRequestParams();
+    public Set<Parameter> getRequestParams() {
+        return requestParams;
+    }
 
-    void setRequestParams(Set<Parameter> requestParams);
+    public void setRequestParams(Set<Parameter> requestParams) {
+        this.requestParams = requestParams;
+    }
 
-    Set<Parameter> getResponseParams();
+    public Set<Parameter> getResponseParams() {
+        return responseParams;
+    }
 
-    void setResponseParams(Set<Parameter> responseParams);
+    public void setResponseParams(Set<Parameter> responseParams) {
+        this.responseParams = responseParams;
+    }
 
+    public int getResponseTime() {
+        return responseTime;
+    }
 
+    public void setResponseTime(int responseTime) {
+        this.responseTime = responseTime;
+    }
 }

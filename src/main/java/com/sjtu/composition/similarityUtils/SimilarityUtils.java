@@ -14,10 +14,10 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class SimilarityUtils {
 
-    // TODO: 是否需要排序？（ B+ 树？）
+    // TODO: Parameter 按 hashcode 顺序作为一级key和二级key，确定顺序后可以减少一半的大小
     private Map<Parameter, Map<Parameter, Double>> mockSimilarityMap = new ConcurrentHashMap<>();
 
-    // TODO: 根据词向量模型获取相似度
+    // 根据词向量模型获取相似度
     public double similarity(Parameter p1, Parameter p2) throws Exception {
         return paramSimilarity(p1, p2);
     }

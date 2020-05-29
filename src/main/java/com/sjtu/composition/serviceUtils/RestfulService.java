@@ -2,6 +2,7 @@ package com.sjtu.composition.serviceUtils;
 
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.support.spring.FastJsonHttpMessageConverter;
+import com.sjtu.composition.graph.executionPath.AutoExecuteException;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.web.client.RestTemplate;
@@ -10,28 +11,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.net.URI;
 import java.util.*;
 
-public class RestfulService implements Service {
-
-    // 服务描述信息：id、服务名、功能描述...
-    private int id = -1;//e.g.0?
-    private String name;//e.g.行政区划区域检索
-    private String description;
-
-    // 服务访问：url，操作类型...
-    private String endpoint;//e.g. http://api.map.baidu.com/place/v2/search
-    private Operation operation;//e.g. GET
-
-    // TODO: 其他QoS度量（吞吐量等）
-    private int responseTime;
-
-    // 独有属性，不参与匹配，例如 开发key
-    private Set<Parameter> uniqueRequestParams;
-
-    // 输入/输出
-    private Set<Parameter> requestParams;// path | query | body
-    private Set<Parameter> responseParams;
-
-    //TODO: 保存参数的嵌套结构(type:object)
+public class RestfulService extends Service {
 
     public RestfulService(String name, String description, int responseTime,
                           String endpoint, Operation operation,
@@ -79,12 +59,11 @@ public class RestfulService implements Service {
         restTemplate.getMessageConverters().add(new FastJsonHttpMessageConverter());
     }
 
-    //TODO: request body
+    //TODO: PATH, BODY
     //      POST, PUT, DELETE
-    public JSONObject run(Map<Parameter, Object> matches) {
+    @Override
+    public boolean run(Map<Parameter, Object> matches) throws AutoExecuteException {
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(endpoint);
-//        Map<String, Object> uriVariableMap = new HashMap<>();//path
-
         for (Parameter param : uniqueRequestParams) {
             String paramName = param.getName();
             if (param.getDefaultValue() != null) {
@@ -94,117 +73,48 @@ public class RestfulService implements Service {
         for (Parameter requestParam : requestParams) {
             Object paramValue = matches.get(requestParam);
             switch (requestParam.getParamCategory()) {
-                case PATH:
-//                    uriVariableMap.put(requestParam.getName(), paramValue);
-                    break;
                 case QUERY:
                     if (paramValue != null) {
                         builder.queryParam(requestParam.getName(), paramValue);
                     }
                     break;
+                case PATH:
                 case BODY:
                 default:
+                    throw new AutoExecuteException("Param Type Not Supported:" + requestParam.getParamCategory());
             }
         }
         URI uri = builder
                 .build()
-//                .expand(uriVariableMap)
                 .encode()
                 .toUri();
         System.out.println(builder.build());
         System.out.println(uri);
+        JSONObject responseJSONObject;
         switch (this.operation) {
             case GET:
-                JSONObject jsonObject = restTemplate.getForObject(uri, JSONObject.class);
-                if (jsonObject == null) {
-                    return null;
-                }
-                for (Parameter responseParam : responseParams) {
-                    String paramName = responseParam.getName();
-                    Object paramValue = jsonObject.get(paramName);
-                    matches.put(responseParam, paramValue);
-                }
-                return jsonObject;
+                responseJSONObject = restTemplate.getForObject(uri, JSONObject.class);
+                break;
             case POST:
             case PUT:
             case DELETE:
             default:
+                throw new AutoExecuteException("Operation Type Not Supported:" + this.operation);
         }
-        return null;
-    }
-
-    //getter & setter
-    public int getId() {
-        return id;
-    }
-
-    public void setId(int id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public String getEndpoint() {
-        return endpoint;
-    }
-
-    public void setEndpoint(String endpoint) {
-        this.endpoint = endpoint;
-    }
-
-    public Operation getOperation() {
-        return operation;
-    }
-
-    public void setOperation(Operation operation) {
-        this.operation = operation;
-    }
-
-    @Override
-    public int getResponseTime() {
-        return responseTime;
-    }
-
-    public void setResponseTime(int responseTime) {
-        this.responseTime = responseTime;
-    }
-
-    public Set<Parameter> getUniqueRequestParams() {
-        return uniqueRequestParams;
-    }
-
-    public void setUniqueRequestParams(Set<Parameter> uniqueRequestParams) {
-        this.uniqueRequestParams = uniqueRequestParams;
-    }
-
-    public Set<Parameter> getRequestParams() {
-        return requestParams;
-    }
-
-    public void setRequestParams(Set<Parameter> requestParams) {
-        this.requestParams = requestParams;
-    }
-
-    public Set<Parameter> getResponseParams() {
-        return responseParams;
-    }
-
-    public void setResponseParams(Set<Parameter> responseParams) {
-        this.responseParams = responseParams;
+        if (responseJSONObject == null) {
+            throw new AutoExecuteException("Response null");
+        }
+        for (Parameter responseParam : responseParams) {
+            String paramName = responseParam.getName();
+            if (responseJSONObject.containsKey(paramName)) {
+                Object paramValue = responseJSONObject.get(paramName);
+                matches.put(responseParam, paramValue);
+            } else {
+                throw new AutoExecuteException("auto execute failure: " +
+                        "missing output param {" + responseParam.getName() + "}");
+            }
+        }
+        return true;
     }
 
     @Override
