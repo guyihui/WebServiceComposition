@@ -52,9 +52,13 @@ public class ExecutionPath implements Cloneable {
      * 每次调用解决一个输入，并更新图的相关参数/判断是否满足条件（DAG，最优QoS……）
      */
     public boolean resolve(ParamNode matchSource, ParamNode matchTarget, double similarity) {
+        //可选参数null匹配，不影响QoS，不产生环，不影响相似度下限，无dependency
+        if (matchSource == null) {
+            this.unresolvedInput.remove(matchTarget);
+            return !matchTarget.getParam().isRequired();
+        }
         //更新unresolved
-        //TODO
-        if (this.serviceNodeSet.contains(matchSource.getServiceNode())) {// 包含的 service node 不需要更新
+        if (this.serviceNodeSet.contains(matchSource.getServiceNode())) {// 方案包含的 service node 不需要更新
             ServiceNode preServiceNode = matchSource.getServiceNode();
             // 更新QoS Bound
             if (!this.updateResponseTimeBound(preServiceNode, this.responseTimeBound.get(matchTarget))) {
@@ -141,6 +145,9 @@ public class ExecutionPath implements Cloneable {
         // 处理初始输入
         JSONObject queryArgs = args.getJSONObject("query");
         for (ParamNode matchSource : this.sourceNode.getOutputs()) {
+            if (!matchEdgeMap.containsKey(matchSource)) {
+                continue;
+            }
             switch (matchSource.getParam().getParamCategory()) {
                 case QUERY:
                     Object value = queryArgs.get(matchSource.getParam().getName());
@@ -177,7 +184,9 @@ public class ExecutionPath implements Cloneable {
                 // 一般服务节点，用 allOf 编排
                 List<CompletableFuture> dependFutureList = new ArrayList<>();
                 for (ParamNode input : node.getInputs()) {
-                    //TODO
+                    if (this.matchEdgeMap.get(input) == null && !input.getParam().isRequired()) {
+                        continue;
+                    }
                     ServiceNode dependNode = this.matchEdgeMap.get(input).keySet().iterator().next().getServiceNode();
                     if (dependNode != this.sourceNode) {
                         dependFutureList.add(this.serviceNodeCompletableFutureMap.get(dependNode));

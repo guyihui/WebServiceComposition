@@ -35,7 +35,7 @@ public class CompositionSolution extends ServiceGraph {
      * @param topK 提取出的路径的数量
      * @return 在最优QoS的基础上，按 -匹配相似度的下限- 排序
      */
-    public List<ExecutionPath> extractExecutionPaths(int topK) throws CloneNotSupportedException {
+    public List<ExecutionPath> extractExecutionPaths(int topK) throws Exception {
         // 取前k个结果（匹配相似度下限topK）作为推荐/执行
         List<ExecutionPath> pathList = new ArrayList<>();
 
@@ -67,22 +67,32 @@ public class CompositionSolution extends ServiceGraph {
                 System.out.println("try resolve: " + unresolved);
                 if (this.matchEdgeMap.get(unresolved) == null) {
                     if (unresolved.getParam().isRequired()) {
-                        continue;//必选但无匹配，放弃
+                        throw new Exception("can't resolve a required param");//必选但无匹配，代码逻辑有错
                     } else {
-                        //TODO
-
+                        //可选无匹配
+                        boolean isFeasible = path.resolve(null, unresolved, 0);
+                        if (isFeasible) {//可选参数可以用null匹配
+                            pathPriorityQueue.offer(path);
+                        }
                     }
-                    continue;
-                }
-                for (Map.Entry<ParamNode, Double> edgeEntry : this.matchEdgeMap.get(unresolved).entrySet()) {
-                    ParamNode resolve = edgeEntry.getKey();
-                    ServiceNode preServiceNode = resolve.getServiceNode();//匹配边: pre -> current
-                    //若不存在 current -> pre, 则不形成环
-                    if (!reachableServiceNodeSet.contains(preServiceNode)) {
-                        ExecutionPath clonePath = (ExecutionPath) path.clone();
-                        boolean isFeasible = clonePath.resolve(resolve, unresolved, edgeEntry.getValue());
-                        if (isFeasible) {//resolve不会导致环、QoS劣化
-                            pathPriorityQueue.offer(clonePath);
+                } else {//必选可选有匹配
+                    for (Map.Entry<ParamNode, Double> edgeEntry : this.matchEdgeMap.get(unresolved).entrySet()) {
+                        ParamNode resolve = edgeEntry.getKey();
+                        ServiceNode preServiceNode = resolve.getServiceNode();//匹配边: pre -> current
+                        //若不存在 current -> pre, 则不形成环
+                        if (!reachableServiceNodeSet.contains(preServiceNode)) {
+                            ExecutionPath clonePath = (ExecutionPath) path.clone();
+                            boolean isFeasible = clonePath.resolve(resolve, unresolved, edgeEntry.getValue());
+                            if (isFeasible) {//resolve不会导致环、QoS劣化
+                                pathPriorityQueue.offer(clonePath);
+                            }
+                        }
+                    }
+                    //可选参数可以主动null匹配
+                    if (!unresolved.getParam().isRequired()) {
+                        boolean isFeasible = path.resolve(null, unresolved, 0);
+                        if (isFeasible) {//可选参数可以用null匹配
+                            pathPriorityQueue.offer(path);
                         }
                     }
                 }
