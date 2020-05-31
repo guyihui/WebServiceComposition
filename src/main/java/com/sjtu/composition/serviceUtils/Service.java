@@ -1,8 +1,5 @@
 package com.sjtu.composition.serviceUtils;
 
-import com.alibaba.fastjson.JSONObject;
-import com.sjtu.composition.graph.executionPath.AutoExecuteException;
-
 import java.util.Map;
 import java.util.Set;
 
@@ -26,12 +23,12 @@ public abstract class Service {
     // 输入/输出
     protected Set<Parameter> requestParams;// path | query | body
     protected Set<Parameter> responseParams;
-    //TODO: 保存参数的嵌套结构(type:object)
+    // TODO: 保存参数的嵌套结构(type:object)
 
     protected int responseTime;// TODO: 其他QoS度量（吞吐量等）
 
 
-    //
+    // 需要实现的执行方法
     public abstract boolean run(Map<Parameter, Object> input);
 
 
@@ -106,5 +103,10 @@ public abstract class Service {
 
     public void setResponseTime(int responseTime) {
         this.responseTime = responseTime;
+    }
+
+    @Override
+    public String toString() {
+        return id + ":[" + name + "]" + "(" + endpoint + ")" + "{" + description + "}";
     }
 }

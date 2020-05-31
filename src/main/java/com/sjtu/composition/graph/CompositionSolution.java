@@ -64,6 +64,16 @@ public class CompositionSolution extends ServiceGraph {
                 ParamNode unresolved = entry.getKey();
                 Set<ServiceNode> reachableServiceNodeSet = entry.getValue();
                 // 尝试所有resolve匹配
+                System.out.println("try resolve: " + unresolved);
+                if (this.matchEdgeMap.get(unresolved) == null) {
+                    if (unresolved.getParam().isRequired()) {
+                        continue;//必选但无匹配，放弃
+                    } else {
+                        //TODO
+
+                    }
+                    continue;
+                }
                 for (Map.Entry<ParamNode, Double> edgeEntry : this.matchEdgeMap.get(unresolved).entrySet()) {
                     ParamNode resolve = edgeEntry.getKey();
                     ServiceNode preServiceNode = resolve.getServiceNode();//匹配边: pre -> current

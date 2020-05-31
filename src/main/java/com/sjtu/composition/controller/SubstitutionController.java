@@ -3,6 +3,7 @@ package com.sjtu.composition.controller;
 import com.alibaba.fastjson.JSONObject;
 import com.sjtu.composition.graph.CompositionSolution;
 import com.sjtu.composition.graph.executionPath.ExecutionPath;
+import com.sjtu.composition.graph.serviceGraph.ServiceNode;
 import com.sjtu.composition.serviceUtils.Service;
 import com.sjtu.composition.serviceUtils.ServiceRepository;
 import com.sjtu.composition.similarityUtils.SimilarityUtils;
@@ -39,80 +40,93 @@ public class SubstitutionController {
     }
 
     @PostMapping(value = "/substitution/{serviceId}", produces = "application/json;charset=UTF-8")
-    public JSONObject substitute(@PathVariable("serviceId") int serviceId,
-                                 @RequestParam(value = "k", required = false, defaultValue = "1") int topK,
-                                 @RequestParam(value = "execute", required = false, defaultValue = "false") boolean toExecute,
-                                 @RequestParam("similarity") Double similarityLimit,
-                                 @RequestParam("layer") Integer layerLimit,
-                                 @RequestBody JSONObject inputArgs) {
-        JSONObject result = new JSONObject();
-        result.put("isResolved", false);
-        result.put("message", "");
-        result.put("recommend", new ArrayList<>());
+    public SubstitutionResponse substitute(@PathVariable("serviceId") int serviceId,
+                                           @RequestParam(value = "k", required = false, defaultValue = "1") int topK,
+                                           @RequestParam(value = "execute", required = false, defaultValue = "false") boolean toExecute,
+                                           @RequestParam("similarity") Double similarityLimit,
+                                           @RequestParam("layer") Integer layerLimit,
+                                           @RequestBody JSONObject inputArgs) {
+        SubstitutionResponse response = new SubstitutionResponse();
 
+        // 获取 目标服务 和 服务聚类
         Service targetService = serviceRepository.getServiceById(serviceId);
         if (targetService == null) {
-            result.put("message", "no such service");
-            return result;
+            return response.setMessage("no such service");
         }
         Set<Service> serviceCluster = serviceRepository.getServiceClusterById(serviceId);
 
+        // 创建解决方案
         CompositionSolution solution = new CompositionSolution(
                 targetService, //目标服务
                 serviceCluster, //聚类范围
                 similarityUtils //相似度工具类
         );
 
+        // 构建服务图
         boolean isBuilt;
         try {
             isBuilt = solution.build(similarityLimit, layerLimit);
         } catch (Exception e) {
             e.printStackTrace();
-            result.put("message", e.toString());
-            return result;
+            return response.setMessage(e.toString());
         }
-        if (isBuilt) { // 可尝试执行
 
+        // 根据构建成功与否进行处理
+        if (isBuilt) { // 构建成功，可以提取路径
             System.out.println(solution);
-            List<ExecutionPath> paths = null;
+            // 提取路径
+            List<ExecutionPath> paths;
             try {
                 paths = solution.extractExecutionPaths(topK);
-            } catch (CloneNotSupportedException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
-                result.put("message", e.toString());
-                return result;
+                return response.setMessage(e.toString());
             }
-            result.put("recommend", paths);
-            if (paths == null) {
-                return result;
+            if (paths.isEmpty()) {
+                return response.setMessage("no path");
             }
+            // 执行路径转JSONObject表示
+            List<JSONObject> pathJSONObjectList = new LinkedList<>();
+            Set<Service> involvedServiceSet = new HashSet<>();
+            for (ExecutionPath path : paths) {
+                pathJSONObjectList.add(path.toJSONObject());
+                for (ServiceNode serviceNode : path.getServiceNodeSet()) {
+                    if (serviceNode.getType() == ServiceNode.Type.COMPONENT) {
+                        involvedServiceSet.add(serviceNode.getService());
+                    }
+                }
+            }
+            response.setPaths(pathJSONObjectList)
+                    .setServices(involvedServiceSet)
+                    .setResolved(true)
+                    .setMessage("ok");
             System.out.println("Path count = " + paths.size());
 
+            // 自动执行
             if (toExecute) {
-                List<JSONObject> executions = new ArrayList<>();//TODO:应该只有一个JSONObject（非list）
+                List<JSONObject> executionResults = new LinkedList<>();//TODO:应该只有一个JSONObject（非list）
                 for (ExecutionPath path : paths) {
                     System.out.println(path);
                     if (path.isAvailable()) {
-                        result.put("isResolved", true);
                         JSONObject executionResult = null;
                         try {
                             executionResult = path.run(inputArgs);
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
-                        System.out.println(executionResult);
-                        executions.add(executionResult);
+                        System.out.println("executionResult:" + executionResult);
+                        executionResults.add(executionResult);
                     } else {
-                        executions.add(null);
+                        executionResults.add(null);
                     }
                 }
-                result.put("result", executions);
+                return response.setResults(executionResults);
             }
-            result.put("message", "ok");
         } else { //图构建失败
-            result.put("message", "build failed");
+            // 没有得到全部输出
+            return response.setMessage("build failed");
         }
-        return result;
+        return response;
 
     }
 

@@ -14,8 +14,8 @@ public class ServiceGraph {
     protected Service targetService;
     protected Set<Service> serviceCluster;
     // 图相关结构
-    protected ServiceNode sourceNode = new ServiceNode(null);
-    protected ServiceNode sinkNode = new ServiceNode(null);
+    protected ServiceNode sourceNode = new ServiceNode(ServiceNode.Type.SOURCE);
+    protected ServiceNode sinkNode = new ServiceNode(ServiceNode.Type.SINK);
 
     // 构造约束
     protected boolean isBuilt = false;
@@ -158,7 +158,7 @@ public class ServiceGraph {
                         || serviceNode.getService() == this.targetService) {
                     continue;//已经判断过，跳过
                 }
-                // 对于未判断过的服务，检查服务所有输入是否全部 available
+                // 对于未判断过的服务，检查服务所有必选输入是否全部 available
                 boolean isAvailable = true;
                 for (ParamNode input : serviceNode.getInputs()) {
                     if (input.getParam().isRequired()
@@ -311,6 +311,9 @@ public class ServiceGraph {
             // 2. 匹配边相连直接传递（=）
             Set<ParamNode> updateMatchTarget = new HashSet<>();
             for (ParamNode node : updateMatchSource) {
+                if (!this.matchEdgeMap.containsKey(node)) {
+                    continue;
+                }
                 int floor = node.getResponseTimeFloor();
                 for (ParamNode matchTarget : this.matchEdgeMap.get(node).keySet()) {
                     int responseTimeFloor = matchTarget.getResponseTimeFloor();
@@ -333,7 +336,10 @@ public class ServiceGraph {
                 // 可能产生QoS更新的服务
                 int inputFloorMax = 0;
                 for (ParamNode input : serviceNode.getInputs()) {
-                    if ((!this.paramNodeSet.contains(input) || !input.getParam().isRequired())) {
+                    if (!this.paramNodeSet.contains(input)) {
+                        throw new RuntimeException();
+                    }
+                    if (!input.getParam().isRequired()) {
                         continue;
                     }
                     // 图中存在且必选的输入的最大值为 服务开始时QoS floor
@@ -360,7 +366,10 @@ public class ServiceGraph {
         // 全部更新结束后，得到 sinkNode 的 QoS Floor
         int floorMax = 0;
         for (ParamNode node : this.sinkNode.getInputs()) {
-            if ((!this.paramNodeSet.contains(node) || !node.getParam().isRequired())) {
+            if (!this.paramNodeSet.contains(node)) {
+                throw new RuntimeException();
+            }
+            if (!node.getParam().isRequired()) {
                 continue;
             }
             int floor = node.getResponseTimeFloor();

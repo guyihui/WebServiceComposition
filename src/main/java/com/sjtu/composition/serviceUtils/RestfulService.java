@@ -70,6 +70,7 @@ public class RestfulService extends Service {
                 builder.queryParam(paramName, param.getDefaultValue());
             }
         }
+        //TODO
         for (Parameter requestParam : requestParams) {
             Object paramValue = matches.get(requestParam);
             switch (requestParam.getParamCategory()) {
@@ -117,8 +118,4 @@ public class RestfulService extends Service {
         return true;
     }
 
-    @Override
-    public String toString() {
-        return id + ":[" + name + "]" + "(" + endpoint + ")" + "{" + description + "}";
-    }
 }

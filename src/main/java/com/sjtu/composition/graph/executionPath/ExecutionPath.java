@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.sjtu.composition.graph.serviceGraph.ParamNode;
 import com.sjtu.composition.graph.serviceGraph.ServiceNode;
 import com.sjtu.composition.serviceUtils.Parameter;
+import javafx.util.Pair;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -52,6 +53,7 @@ public class ExecutionPath implements Cloneable {
      */
     public boolean resolve(ParamNode matchSource, ParamNode matchTarget, double similarity) {
         //更新unresolved
+        //TODO
         if (this.serviceNodeSet.contains(matchSource.getServiceNode())) {// 包含的 service node 不需要更新
             ServiceNode preServiceNode = matchSource.getServiceNode();
             // 更新QoS Bound
@@ -175,6 +177,7 @@ public class ExecutionPath implements Cloneable {
                 // 一般服务节点，用 allOf 编排
                 List<CompletableFuture> dependFutureList = new ArrayList<>();
                 for (ParamNode input : node.getInputs()) {
+                    //TODO
                     ServiceNode dependNode = this.matchEdgeMap.get(input).keySet().iterator().next().getServiceNode();
                     if (dependNode != this.sourceNode) {
                         dependFutureList.add(this.serviceNodeCompletableFutureMap.get(dependNode));
@@ -266,6 +269,10 @@ public class ExecutionPath implements Cloneable {
         return unresolvedInput;
     }
 
+    public Set<ServiceNode> getServiceNodeSet() {
+        return serviceNodeSet;
+    }
+
     public double getSimilarityFloor() {
         return similarityFloor;
     }
@@ -306,6 +313,31 @@ public class ExecutionPath implements Cloneable {
         nodeSet.remove(this.sourceNode);
         nodeSet.remove(this.sinkNode);
         return "ExecutionPath{" + nodeSet + "}";
+    }
+
+    public JSONObject toJSONObject() {
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("similarity", similarityFloor);
+        Set<Integer> involvedService = new HashSet<>();
+        for (ServiceNode node : serviceNodeSet) {
+            if (node == this.sourceNode || node == this.sinkNode) {
+                continue;
+            }
+            involvedService.add(node.getService().getId());
+        }
+        jsonObject.put("involvedService", involvedService);
+        Map<Pair<ParamNode, ParamNode>, Double> matchEdges = new HashMap<>();
+        for (Map.Entry<ParamNode, Map<ParamNode, Double>> entry : this.matchEdgeMap.entrySet()) {
+            ParamNode matchSource = entry.getKey();
+            if (matchSource.getType() != ParamNode.Type.OUTPUT) {
+                continue;
+            }
+            ParamNode matchTarget = entry.getValue().keySet().iterator().next();
+            double similarity = entry.getValue().entrySet().iterator().next().getValue();
+            matchEdges.put(new Pair<>(matchSource, matchTarget), similarity);
+        }
+        jsonObject.put("match", matchEdges);
+        return jsonObject;
     }
 
 }

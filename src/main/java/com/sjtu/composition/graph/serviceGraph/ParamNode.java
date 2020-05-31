@@ -56,6 +56,6 @@ public class ParamNode {
 
     @Override
     public String toString() {
-        return param.getName();
+        return serviceNode + "." + param.getName();
     }
 }
